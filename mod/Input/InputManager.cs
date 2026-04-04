@@ -43,6 +43,24 @@ namespace AccessibilityMod.Input
                 return;
             }
 
+            if (navigationSystem.IsCategorySelectionActive)
+            {
+                if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha1))
+                    navigationSystem.ConfirmWaypointCategory(WaypointCategory.NPCs);
+                else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha2))
+                    navigationSystem.ConfirmWaypointCategory(WaypointCategory.Locations);
+                else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha3)
+                      || UnityEngine.Input.GetKeyDown(KeyCode.Return)
+                      || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+                    navigationSystem.ConfirmWaypointCategory(WaypointCategory.General);
+                else if (UnityEngine.Input.GetKeyDown(KeyCode.Escape))
+                    navigationSystem.CancelCategorySelection();
+
+                Il2CppInControl.InputManager.ClearInputState();
+                UnityEngine.Input.ResetInputAxes();
+                return;
+            }
+
             // On-demand current selection announcement: Grave/Tilde key (`)
             if (UnityEngine.Input.GetKeyDown(KeyCode.BackQuote))
             {
@@ -66,40 +84,43 @@ namespace AccessibilityMod.Input
             bool ctrlHeld = UnityEngine.Input.GetKey(KeyCode.LeftControl) || UnityEngine.Input.GetKey(KeyCode.RightControl);
             bool altHeld = UnityEngine.Input.GetKey(KeyCode.LeftAlt) || UnityEngine.Input.GetKey(KeyCode.RightAlt);
 
+            bool backslashDown = UnityEngine.Input.GetKeyDown(KeyCode.Backslash);
+            bool equalsDown = UnityEngine.Input.GetKeyDown(KeyCode.Equals);
+
             // Category selection keys (safe punctuation) + modifiers for waypoints
             if (leftBracketDown)
             {
                 if (altHeld)
-                {
                     navigationSystem.StartWaypointCreation();
-                }
                 else if (ctrlHeld)
-                {
                     navigationSystem.FocusWaypoints();
-                }
+                else if (navigationSystem.IsWaypointFocus)
+                    navigationSystem.SelectWaypointCategory(WaypointCategory.NPCs);
                 else
-                {
                     navigationSystem.SelectCategory(ObjectCategory.NPCs);
-                }
             }
             else if (rightBracketDown)  // ]
             {
                 if (altHeld)
-                {
                     navigationSystem.DeleteCurrentWaypoint();
-                }
+                else if (navigationSystem.IsWaypointFocus)
+                    navigationSystem.SelectWaypointCategory(WaypointCategory.Locations);
                 else
-                {
                     navigationSystem.SelectCategory(ObjectCategory.Locations);
-                }
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.Backslash))  // \
+            else if (backslashDown)  // \
             {
-                navigationSystem.SelectCategory(ObjectCategory.Loot);
+                if (navigationSystem.IsWaypointFocus)
+                    TolkScreenReader.Instance.Speak("Press left bracket for NPC waypoints, right bracket for locations, or equals for all.", true);
+                else
+                    navigationSystem.SelectCategory(ObjectCategory.Loot);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.Equals))  // =
+            else if (equalsDown)  // =
             {
-                navigationSystem.SelectCategory(ObjectCategory.Everything);
+                if (navigationSystem.IsWaypointFocus)
+                    navigationSystem.SelectWaypointCategory(null);  // null = all
+                else
+                    navigationSystem.SelectCategory(ObjectCategory.Everything);
             }
             
             // Cycle within current category: Period (.) forward, Shift+Period backward

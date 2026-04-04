@@ -160,4 +160,11 @@
   <Target Name="CopyToModsFolder" AfterTargets="Build" Condition="'$(DISCO_ELYSIUM_PATH)' != ''">
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(DISCO_ELYSIUM_PATH)\Mods" />
   </Target>
+
+  <Target Name="CopyDataToUserData" AfterTargets="Build" Condition="'$(DISCO_ELYSIUM_PATH)' != ''">
+    <ItemGroup>
+      <DataFiles Include="$(MSBuildProjectDirectory)\Data\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DataFiles)" DestinationFolder="$(DISCO_ELYSIUM_PATH)\UserData" />
+  </Target>
 </Project>

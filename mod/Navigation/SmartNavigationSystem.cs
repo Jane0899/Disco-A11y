@@ -24,12 +24,17 @@ namespace AccessibilityMod.Navigation
 
         private NavigationFocus currentFocus = NavigationFocus.ObjectCategories;
         private WaypointNamingSession namingSession;
+        private bool isCategorySelectionActive;
+        private Vector3 pendingWaypointPosition;
+        private string pendingWaypointName;
+        private string pendingWaypointScene;
 
         public NavigationStateManager StateManager => stateManager;
         public MovementController MovementController => movementController;
         public WaypointManager WaypointManager => waypointManager;
         public bool IsWaypointNamingActive => namingSession?.IsActive ?? false;
         public bool IsWaypointFocus => currentFocus == NavigationFocus.Waypoints;
+        public bool IsCategorySelectionActive => isCategorySelectionActive;
 
         public SmartNavigationSystem()
         {
@@ -43,6 +48,12 @@ namespace AccessibilityMod.Navigation
             if (IsWaypointNamingActive)
             {
                 TolkScreenReader.Instance.Speak("Finish naming your waypoint first. Press Enter to save or Escape to cancel.", true);
+                return;
+            }
+
+            if (isCategorySelectionActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish selecting a category first.", true);
                 return;
             }
 
@@ -93,9 +104,24 @@ namespace AccessibilityMod.Navigation
                 return;
             }
 
+            if (isCategorySelectionActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish selecting a category first.", true);
+                return;
+            }
+
+            if (currentFocus == NavigationFocus.Waypoints)
+            {
+                currentFocus = NavigationFocus.ObjectCategories;
+                TolkScreenReader.Instance.Speak("Waypoint mode off. Press [ for NPCs, ] for locations, or \\ for loot.", true);
+                return;
+            }
+
             currentFocus = NavigationFocus.Waypoints;
 
             string sceneKey = GetActiveSceneKey();
+            waypointManager.ClearCategoryFilter(sceneKey);
+
             if (!waypointManager.HasWaypointsInScene(sceneKey))
             {
                 string message = waypointManager.HasAnyWaypoints
@@ -109,11 +135,72 @@ namespace AccessibilityMod.Navigation
             AnnounceWaypointSelection(sceneKey, includeCategoryIntro: true);
         }
 
+        public void SelectWaypointCategory(WaypointCategory? category)
+        {
+            if (IsWaypointNamingActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish naming your waypoint first. Press Enter to save or Escape to cancel.", true);
+                return;
+            }
+
+            if (isCategorySelectionActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish selecting a category first.", true);
+                return;
+            }
+
+            string sceneKey = GetActiveSceneKey();
+            waypointManager.SetCategoryFilter(sceneKey, category);
+            waypointManager.EnsureSelection(sceneKey);
+
+            if (!waypointManager.HasWaypointsInScene(sceneKey))
+            {
+                string label = GetWaypointCategoryLabel(category);
+                string message = label == "all"
+                    ? "No waypoints saved for this area."
+                    : $"No {label} waypoints in this area.";
+                TolkScreenReader.Instance.Speak(message, true);
+                return;
+            }
+
+            AnnounceWaypointSelection(sceneKey, includeCategoryIntro: true);
+        }
+
+        public void ConfirmWaypointCategory(WaypointCategory category)
+        {
+            if (!isCategorySelectionActive) return;
+
+            isCategorySelectionActive = false;
+            waypointManager.AddWaypoint(pendingWaypointPosition, pendingWaypointName, pendingWaypointScene, category);
+
+            WaypointCategory? filterToSet = category == WaypointCategory.General
+                ? (WaypointCategory?)null
+                : category;
+            waypointManager.SetCategoryFilter(pendingWaypointScene, filterToSet);
+
+            currentFocus = NavigationFocus.Waypoints;
+            string prefix = $"Waypoint {pendingWaypointName} saved.";
+            AnnounceWaypointSelection(pendingWaypointScene, includeCategoryIntro: true, prefix: prefix);
+        }
+
+        public void CancelCategorySelection()
+        {
+            if (!isCategorySelectionActive) return;
+            isCategorySelectionActive = false;
+            TolkScreenReader.Instance.Speak("Waypoint creation cancelled.", true);
+        }
+
         public void StartWaypointCreation()
         {
             if (IsWaypointNamingActive)
             {
                 TolkScreenReader.Instance.Speak("Already naming a waypoint. Press Enter to confirm or Escape to cancel.", true);
+                return;
+            }
+
+            if (isCategorySelectionActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish selecting a category first.", true);
                 return;
             }
 
@@ -156,6 +243,12 @@ namespace AccessibilityMod.Navigation
             if (IsWaypointNamingActive)
             {
                 TolkScreenReader.Instance.Speak("Finish naming your waypoint first. Press Enter to save or Escape to cancel.", true);
+                return;
+            }
+
+            if (isCategorySelectionActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish selecting a category first.", true);
                 return;
             }
 
@@ -212,6 +305,12 @@ namespace AccessibilityMod.Navigation
                 return;
             }
 
+            if (isCategorySelectionActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish selecting a category first.", true);
+                return;
+            }
+
             try
             {
                 if (currentFocus == NavigationFocus.Waypoints)
@@ -219,9 +318,13 @@ namespace AccessibilityMod.Navigation
                     string sceneKey = GetActiveSceneKey();
                     if (!waypointManager.HasWaypointsInScene(sceneKey))
                     {
-                        string message = waypointManager.HasAnyWaypoints
-                            ? "No waypoints saved for this area. Press Alt plus Left Bracket to create one here."
-                            : "No waypoints saved yet. Press Alt plus Left Bracket to create one.";
+                        WaypointCategory? filter = waypointManager.GetCategoryFilter(sceneKey);
+                        string label = GetWaypointCategoryLabel(filter);
+                        string message = filter.HasValue
+                            ? $"No {label} waypoints in this area."
+                            : (waypointManager.HasAnyWaypoints
+                                ? "No waypoints saved for this area. Press Alt plus Left Bracket to create one here."
+                                : "No waypoints saved yet. Press Alt plus Left Bracket to create one.");
                         TolkScreenReader.Instance.Speak(message, true);
                         return;
                     }
@@ -644,6 +747,15 @@ namespace AccessibilityMod.Navigation
             return lower.StartsWith("char_") || lower.StartsWith("animation");
         }
 
+        private string GetWaypointCategoryLabel(WaypointCategory? category) => category switch
+        {
+            WaypointCategory.NPCs => "NPC",
+            WaypointCategory.Locations => "location",
+            WaypointCategory.General => "general",
+            null => "all",
+            _ => "waypoint"
+        };
+
         private void AnnounceWaypointSelection(string sceneKey, bool includeCategoryIntro, string prefix = null)
         {
             if (!waypointManager.TryGetSelection(sceneKey, out var waypoint, out int selectedIndex, out int totalCount))
@@ -677,7 +789,10 @@ namespace AccessibilityMod.Navigation
 
             if (includeCategoryIntro)
             {
-                announcement = $"Waypoints: {announcement}";
+                WaypointCategory? filter = waypointManager.GetCategoryFilter(sceneKey);
+                string label = GetWaypointCategoryLabel(filter);
+                string intro = label == "all" ? "Waypoints" : $"{char.ToUpper(label[0])}{label.Substring(1)} waypoints";
+                announcement = $"{intro}: {announcement}";
             }
 
             MelonLogger.Msg($"[WAYPOINTS] {announcement}");
@@ -687,12 +802,14 @@ namespace AccessibilityMod.Navigation
         private void OnWaypointNamingCompleted(string finalName, Vector3 position, string sceneName, bool usedDefault)
         {
             namingSession = null;
+            pendingWaypointPosition = position;
+            pendingWaypointName = finalName;
+            pendingWaypointScene = sceneName;
+            isCategorySelectionActive = true;
 
-            waypointManager.AddWaypoint(position, finalName, sceneName);
-            currentFocus = NavigationFocus.Waypoints;
-
-            string prefix = $"Waypoint {finalName} saved.";
-            AnnounceWaypointSelection(sceneName, includeCategoryIntro: true, prefix: prefix);
+            TolkScreenReader.Instance.Speak(
+                $"Waypoint {finalName} named. Select category: 1 NPC, 2 location, 3 general, or press Enter for general.",
+                true);
         }
 
         private void OnWaypointNamingCancelled()

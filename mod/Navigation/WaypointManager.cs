@@ -6,6 +6,13 @@ using MelonLoader;
 
 namespace AccessibilityMod.Navigation
 {
+    public enum WaypointCategory
+    {
+        General = 0,   // Default; 0 = backward-compatible with missing JSON field
+        NPCs = 1,
+        Locations = 2
+    }
+
     public class Waypoint
     {
         public Waypoint(Vector3 position, string name, string sceneName)
@@ -14,17 +21,24 @@ namespace AccessibilityMod.Navigation
         }
 
         public Waypoint(Vector3 position, string name, string sceneName, DateTime createdAtUtc)
+            : this(position, name, sceneName, createdAtUtc, WaypointCategory.General)
+        {
+        }
+
+        public Waypoint(Vector3 position, string name, string sceneName, DateTime createdAtUtc, WaypointCategory category)
         {
             Position = position;
             Name = name;
             SceneName = sceneName;
             CreatedAtUtc = createdAtUtc;
+            Category = category;
         }
 
         public Vector3 Position { get; }
         public string Name { get; private set; }
         public string SceneName { get; }
         public DateTime CreatedAtUtc { get; }
+        public WaypointCategory Category { get; }
 
         public void Rename(string newName)
         {
@@ -38,6 +52,7 @@ namespace AccessibilityMod.Navigation
         private readonly WaypointPersistence persistence;
         private readonly List<Waypoint> waypoints;
         private readonly Dictionary<string, int> selectedIndicesByScene = new Dictionary<string, int>();
+        private readonly Dictionary<string, WaypointCategory?> currentCategoryByScene = new Dictionary<string, WaypointCategory?>();
 
         public IReadOnlyList<Waypoint> Waypoints => waypoints;
         public int Count => waypoints.Count;
@@ -62,13 +77,28 @@ namespace AccessibilityMod.Navigation
 
         public string GetDefaultName(string sceneName)
         {
-            int perSceneCount = GetWaypointsForScene(sceneName).Count;
-            return $"Waypoint {perSceneCount + 1}";
+            int totalCount = waypoints.Count(w => w.SceneName == sceneName);
+            return $"Waypoint {totalCount + 1}";
         }
 
-        public Waypoint AddWaypoint(Vector3 position, string name, string sceneName)
+        public void SetCategoryFilter(string sceneName, WaypointCategory? category)
         {
-            var waypoint = new Waypoint(position, name, sceneName);
+            currentCategoryByScene[sceneName] = category;
+        }
+
+        public WaypointCategory? GetCategoryFilter(string sceneName)
+        {
+            return currentCategoryByScene.TryGetValue(sceneName, out WaypointCategory? cat) ? cat : null;
+        }
+
+        public void ClearCategoryFilter(string sceneName)
+        {
+            currentCategoryByScene.Remove(sceneName);
+        }
+
+        public Waypoint AddWaypoint(Vector3 position, string name, string sceneName, WaypointCategory category = WaypointCategory.General)
+        {
+            var waypoint = new Waypoint(position, name, sceneName, DateTime.UtcNow, category);
             waypoints.Add(waypoint);
 
             var sceneWaypoints = GetWaypointsForScene(sceneName);
@@ -175,7 +205,13 @@ namespace AccessibilityMod.Navigation
             if (string.IsNullOrEmpty(sceneName))
                 return new List<Waypoint>();
 
-            return waypoints.Where(w => w.SceneName == sceneName).OrderBy(w => w.CreatedAtUtc).ToList();
+            var all = waypoints.Where(w => w.SceneName == sceneName).OrderBy(w => w.CreatedAtUtc);
+
+            WaypointCategory? filter = GetCategoryFilter(sceneName);
+            if (filter.HasValue)
+                all = all.Where(w => w.Category == filter.Value).OrderBy(w => w.CreatedAtUtc);
+
+            return all.ToList();
         }
 
         private int GetSelectedIndexForScene(string sceneName, int totalCount)

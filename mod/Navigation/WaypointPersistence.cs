@@ -77,6 +77,7 @@ namespace AccessibilityMod.Navigation
             public string Name { get; set; }
             public string SceneName { get; set; }
             public DateTime CreatedAtUtc { get; set; }
+            public WaypointCategory Category { get; set; }
 
             public static WaypointRecord FromWaypoint(Waypoint waypoint)
             {
@@ -87,7 +88,8 @@ namespace AccessibilityMod.Navigation
                     Z = waypoint.Position.z,
                     Name = waypoint.Name,
                     SceneName = waypoint.SceneName,
-                    CreatedAtUtc = waypoint.CreatedAtUtc
+                    CreatedAtUtc = waypoint.CreatedAtUtc,
+                    Category = waypoint.Category
                 };
             }
 
@@ -98,7 +100,7 @@ namespace AccessibilityMod.Navigation
                 string scene = SceneName ?? string.Empty;
                 DateTime created = CreatedAtUtc == default ? DateTime.UtcNow : CreatedAtUtc;
 
-                return new Waypoint(position, name, scene, created);
+                return new Waypoint(position, name, scene, created, Category);
             }
         }
     }
