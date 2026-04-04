@@ -81,29 +81,29 @@ namespace AccessibilityMod.Utils
             // Logical-order text has an INITIAL or ISOLATED form first.
             if (!IsVisualOrder(text))
             {
+                // TMP's RTL mode reverses embedded digit sequences (0.90 → 09.0).
+                // Fix these in logical-order text without reversing the Arabic.
+                string fixed_text = FixReversedNumbers(text);
                 if (UI.TextExtractor.DiagnosticLogging)
-                    MelonLogger.Msg($"[RTL-FIX] Already logical: \"{(text.Length > 40 ? text.Substring(0, 40) + "..." : text)}\"");
-                return text;
+                {
+                    string display = fixed_text.Length > 40 ? fixed_text.Substring(0, 40) + "..." : fixed_text;
+                    MelonLogger.Msg($"[RTL-FIX] Already logical (numbers fixed): \"{display}\"");
+                }
+                return fixed_text;
             }
-
-            // Determine reversal strategy. I2 uses two different reversal modes:
-            // - Pure Arabic text: full character-by-character reversal (numbers reversed too)
-            // - Mixed LTR+Arabic text: bidi-aware reversal (LTR runs preserved)
-            // When Latin letters precede Arabic, I2 preserved LTR runs, so we must
-            // re-reverse them after our full reversal to keep them correct.
-            bool preserveLTR = HasLatinBeforeArabic(text);
 
             // Normalize line endings before splitting — the game mixes \r\n and \n,
             // and stray \r can cause lines to merge or split incorrectly.
             string normalized = text.Replace("\r\n", "\n").Replace("\r", "\n");
 
-            // Reverse each line independently to preserve line order.
-            // A full-string reverse would flip line order (Line1\nLine2 → Line2\nLine1).
+            // Reverse each line with LTR run preservation. I2's reversal is bidi-aware:
+            // it reverses Arabic runs but preserves LTR runs (numbers, Latin text).
+            // Our reversal must match: reverse everything, then re-reverse LTR runs.
             string[] lines = normalized.Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
                 if (ContainsRTLCharacters(lines[i]))
-                    lines[i] = preserveLTR ? ReverseLinePreserveLTR(lines[i]) : ReverseLine(lines[i]);
+                    lines[i] = ReverseLinePreserveLTR(lines[i]);
             }
             string result = string.Join("\n", lines);
 
@@ -365,30 +365,85 @@ namespace AccessibilityMod.Utils
         }
 
         /// <summary>
-        /// Reverse a single line of text, correctly handling surrogate pairs
-        /// and combining characters.
-        ///
-        /// I2 Localization reverses the entire string character-by-character for
-        /// visual RTL display, including embedded numbers. A simple reversal back
-        /// to logical order automatically restores both Arabic text and number
-        /// sequences to their correct reading order.
+        /// Fix reversed connected-number sequences in TMP logical-order Arabic text.
+        /// TMP's RTL mode reverses digit runs that contain connectors (0.90 → 09.0,
+        /// 10-10 → 01-01, 10/10 → 01/01) but leaves plain integers alone (14 stays 14).
+        /// Runs can start with a leading connector (TMP reverses 0.50 → 05.0, where
+        /// the period moves). Only runs containing at least one connector are reversed.
         /// </summary>
-        private static string ReverseLine(string text)
+        private static string FixReversedNumbers(string text)
         {
-            var elements = StringInfo.GetTextElementEnumerator(text);
-            var textElements = new System.Collections.Generic.List<string>();
-            while (elements.MoveNext())
-            {
-                textElements.Add(elements.GetTextElement());
-            }
-            textElements.Reverse();
-
             var sb = new StringBuilder(text.Length);
-            for (int i = 0; i < textElements.Count; i++)
+            int i = 0;
+            while (i < text.Length)
             {
-                sb.Append(textElements[i]);
+                // Start a run on a digit, or on a connector immediately followed by a digit
+                if (IsDigitChar(text[i]) ||
+                    (IsNumberConnector(text[i]) && i + 1 < text.Length && IsDigitChar(text[i + 1])))
+                {
+                    int start = i;
+                    i++;
+                    while (i < text.Length)
+                    {
+                        if (IsDigitChar(text[i]))
+                        {
+                            i++;
+                        }
+                        else if (IsNumberConnector(text[i]) &&
+                                 i + 1 < text.Length &&
+                                 IsDigitChar(text[i + 1]))
+                        {
+                            i++;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    // Only reverse runs that contain a connector — TMP reverses
+                    // connected numbers (0.90, 10-10) but not plain integers (14)
+                    bool hasConnector = false;
+                    for (int k = start; k < i; k++)
+                    {
+                        if (IsNumberConnector(text[k]))
+                        {
+                            hasConnector = true;
+                            break;
+                        }
+                    }
+
+                    if (hasConnector)
+                    {
+                        for (int j = i - 1; j >= start; j--)
+                            sb.Append(text[j]);
+                    }
+                    else
+                    {
+                        // Plain integer — leave unchanged
+                        for (int j = start; j < i; j++)
+                            sb.Append(text[j]);
+                    }
+                }
+                else
+                {
+                    sb.Append(text[i]);
+                    i++;
+                }
             }
             return sb.ToString();
+        }
+
+        private static bool IsDigitChar(char c)
+        {
+            return (c >= '0' && c <= '9') ||
+                   (c >= '\u0660' && c <= '\u0669') || // Arabic-Indic digits
+                   (c >= '\u06F0' && c <= '\u06F9');   // Extended Arabic-Indic digits
+        }
+
+        private static bool IsNumberConnector(char c)
+        {
+            return c == '.' || c == '-' || c == ':' || c == '/';
         }
 
         /// <summary>
@@ -442,28 +497,6 @@ namespace AccessibilityMod.Utils
                 }
             }
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// Check if Latin letters appear before the first Arabic character.
-        /// This indicates I2 used bidi-aware reversal (preserving LTR runs)
-        /// rather than full character-by-character reversal.
-        /// </summary>
-        private static bool HasLatinBeforeArabic(string text)
-        {
-            bool seenLatin = false;
-            for (int i = 0; i < text.Length; i++)
-            {
-                char c = text[i];
-                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
-                {
-                    seenLatin = true;
-                    continue;
-                }
-                if (IsRTLChar(c))
-                    return seenLatin;
-            }
-            return false;
         }
 
         /// <summary>
