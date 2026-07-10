@@ -104,6 +104,9 @@ Layout-safe preset (recommended for non-US keyboards, or laptops without a numpa
 ### Keybind Editor Tool (tools/KeybindEditor)
 A standalone WinForms app (not part of the mod DLL) for editing `UserData/AccessibilityMod.cfg` without launching the game: pick a game folder, load a preset or freely rebind any action to any key, edit the dialog reading mode / orb announcements / speech interrupt settings, save. Localized (English/German). Requires the mod to have been built and installed at least once so its `GameKey` list conceptually matches (the tool's `GameKeyCatalog.cs` is a hand-kept mirror of `mod/Settings/KeyBindings.cs`'s `Defaults`/`NumpadSafePreset` - keep both in sync when adding/renaming a `GameKey`). Build: `cd tools/KeybindEditor && dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true`.
 
+### Installer Tool (tools/Installer)
+A standalone WinForms app that installs MelonLoader (dynamic latest-release lookup + PE-header architecture detection, pinned `v0.7.3` fallback) and the mod itself (from a GitHub release - defaults to `danijel1124/Disco-A11y` since upstream `game-a11y/Disco-A11y` has never published one) into an auto-detected or manually chosen game folder. Also has a permanent non-interactive CLI mode: `DiscoElysiumInstaller.exe --cli [gamePath] [--force]` (skips reinstalling an already-present MelonLoader unless `--force`). Also localized (English/German), also vendors `TolkNative/` for spoken status. Build: same pattern as KeybindEditor, `cd tools/Installer && dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true`.
+
 ### Object Categories
 The system categorizes all interactable objects into logical groups:
 - **NPCs**: Characters and dialogue targets

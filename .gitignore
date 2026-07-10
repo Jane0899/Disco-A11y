@@ -10,7 +10,7 @@ tools/**/obj/
 release/
 
 # Vendored native dependency, not a build artifact - keep despite the *.dll rule above.
-!tools/KeybindEditor/TolkNative/*.dll
+!tools/**/TolkNative/*.dll
 
 # Visual Studio solution files
 *.sln

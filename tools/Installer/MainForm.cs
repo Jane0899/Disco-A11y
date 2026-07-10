@@ -1,0 +1,179 @@
+using System.Windows.Forms;
+
+namespace Installer;
+
+public sealed class MainForm : Form
+{
+    private readonly Label languageLabel;
+    private readonly ComboBox languageCombo;
+    private readonly Label gamePathLabel;
+    private readonly TextBox gamePathBox;
+    private readonly Button browseButton;
+    private readonly Button installButton;
+    private readonly Button openKeybindEditorButton;
+    private readonly ListBox logList;
+
+    public MainForm()
+    {
+        Width = 640;
+        Height = 480;
+        StartPosition = FormStartPosition.CenterScreen;
+
+        languageLabel = new Label { Left = 12, Top = 15, Width = 90 };
+        languageCombo = new ComboBox { Left = 105, Top = 12, Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
+        languageCombo.Items.Add("English");
+        languageCombo.Items.Add("Deutsch");
+        languageCombo.SelectedIndex = Strings.Current == Language.German ? 1 : 0;
+        languageCombo.SelectedIndexChanged += (_, _) =>
+        {
+            Strings.Current = languageCombo.SelectedIndex == 1 ? Language.German : Language.English;
+            ApplyLocalization();
+        };
+
+        gamePathLabel = new Label { Left = 12, Top = 50, Width = 90 };
+        gamePathBox = new TextBox { Left = 105, Top = 47, Width = 400 };
+        browseButton = new Button { Left = 515, Top = 46, Width = 100 };
+        browseButton.Click += BrowseButton_Click;
+
+        installButton = new Button { Left = 12, Top = 85, Width = 200, Height = 32 };
+        installButton.Click += InstallButton_Click;
+
+        openKeybindEditorButton = new Button { Left = 220, Top = 85, Width = 200, Height = 32 };
+        openKeybindEditorButton.Click += OpenKeybindEditorButton_Click;
+
+        logList = new ListBox { Left = 12, Top = 130, Width = 603, Height = 300, HorizontalScrollbar = true };
+
+        Controls.AddRange(new Control[]
+        {
+            languageLabel, languageCombo,
+            gamePathLabel, gamePathBox, browseButton,
+            installButton, openKeybindEditorButton,
+            logList,
+        });
+
+        ApplyLocalization();
+
+        Load += async (_, _) =>
+        {
+            Tolk.Initialize();
+            var found = GamePathFinder.FindGamePath();
+            if (found != null)
+            {
+                gamePathBox.Text = found;
+                Log(Strings.Get("StatusGameFound", found));
+            }
+            else
+            {
+                Log(Strings.Get("StatusGameNotFoundAuto"));
+            }
+            await Task.CompletedTask;
+        };
+        FormClosed += (_, _) => Tolk.Shutdown();
+    }
+
+    private void ApplyLocalization()
+    {
+        Text = Strings.Get("WindowTitle");
+        languageLabel.Text = Strings.Get("LanguageLabel");
+        gamePathLabel.Text = Strings.Get("GamePathLabel");
+        browseButton.Text = Strings.Get("Browse");
+        installButton.Text = Strings.Get("Install");
+        openKeybindEditorButton.Text = Strings.Get("OpenKeybindEditor");
+        logList.AccessibleName = Strings.Get("LogAccessible");
+    }
+
+    private void BrowseButton_Click(object? sender, EventArgs e)
+    {
+        using var dialog = new FolderBrowserDialog { Description = Strings.Get("BrowseDialogTitle") };
+        if (Directory.Exists(gamePathBox.Text)) dialog.SelectedPath = gamePathBox.Text;
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            gamePathBox.Text = dialog.SelectedPath;
+        }
+    }
+
+    private async void InstallButton_Click(object? sender, EventArgs e)
+    {
+        var gamePath = gamePathBox.Text.Trim();
+        if (!GamePathFinder.IsValid(gamePath))
+        {
+            Log(Strings.Get("StatusGamePathMissing"));
+            return;
+        }
+
+        installButton.Enabled = false;
+        browseButton.Enabled = false;
+
+        try
+        {
+            Log(Strings.Get("StepCheckMelonLoader"));
+            var installMelonLoader = true;
+            if (MelonLoaderInstaller.IsInstalled(gamePath))
+            {
+                Log(Strings.Get("StepMelonLoaderPresent"));
+                var result = MessageBox.Show(this, Strings.Get("ReinstallPromptText"), Strings.Get("ReinstallPromptTitle"),
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                installMelonLoader = result == DialogResult.Yes;
+            }
+
+            if (installMelonLoader)
+            {
+                var exePath = Path.Combine(gamePath, "disco.exe");
+                await MelonLoaderInstaller.InstallAsync(gamePath, exePath, Log);
+                Log(Strings.Get("StepMelonLoaderDone"));
+            }
+
+            var tag = await ModInstaller.InstallLatestAsync(gamePath, Log);
+            Log($"[{tag}] " + Strings.Get("StepDone"));
+
+            Tolk.Speak(Strings.Get("InstallCompleteDialog"));
+            MessageBox.Show(this, Strings.Get("InstallCompleteDialog"), Strings.Get("DialogTitle"),
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            Log(Strings.Get("StepError", ex.Message));
+            var message = Strings.Get("InstallErrorDialog", ex.Message);
+            Tolk.Speak(message);
+            MessageBox.Show(this, message, Strings.Get("DialogTitle"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            installButton.Enabled = true;
+            browseButton.Enabled = true;
+        }
+    }
+
+    private void OpenKeybindEditorButton_Click(object? sender, EventArgs e)
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "DiscoElysiumKeybindEditor.exe"),
+            Path.Combine(AppContext.BaseDirectory, "..", "KeybindEditor", "DiscoElysiumKeybindEditor.exe"),
+        };
+
+        var exe = candidates.FirstOrDefault(File.Exists);
+        if (exe == null)
+        {
+            Log(Strings.Get("KeybindEditorNotFound"));
+            MessageBox.Show(this, Strings.Get("KeybindEditorNotFound"), Strings.Get("DialogTitle"),
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true });
+    }
+
+    private void Log(string message)
+    {
+        if (InvokeRequired)
+        {
+            Invoke(new Action(() => Log(message)));
+            return;
+        }
+
+        logList.Items.Add(message);
+        logList.TopIndex = logList.Items.Count - 1;
+        Tolk.Speak(message);
+    }
+}
