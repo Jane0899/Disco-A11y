@@ -1,0 +1,311 @@
+using System.Windows.Forms;
+
+namespace KeybindEditor;
+
+public sealed class MainForm : Form
+{
+    private const string DefaultGamePath = @"C:\Program Files (x86)\Steam\steamapps\common\Disco Elysium";
+
+    private readonly Label languageLabel;
+    private readonly ComboBox languageCombo;
+    private readonly Label gamePathLabel;
+    private readonly TextBox gamePathBox;
+    private readonly Button browseButton;
+    private readonly ListView bindingsList;
+    private readonly Button rebindButton;
+    private readonly Button resetSelectedButton;
+    private readonly Button defaultPresetButton;
+    private readonly Button safePresetButton;
+    private readonly GroupBox generalGroup;
+    private readonly Label dialogModeLabel;
+    private readonly ComboBox dialogModeCombo;
+    private readonly CheckBox orbAnnouncementsCheck;
+    private readonly CheckBox speechInterruptCheck;
+    private readonly Button saveButton;
+    private readonly Label statusLabel;
+
+    private ModConfig config = new();
+    private int capturingIndex = -1;
+    private bool loaded;
+
+    public MainForm()
+    {
+        Width = 720;
+        Height = 640;
+        StartPosition = FormStartPosition.CenterScreen;
+        KeyPreview = true;
+
+        languageLabel = new Label { Left = 12, Top = 15, Width = 90 };
+        languageCombo = new ComboBox { Left = 105, Top = 12, Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
+        languageCombo.Items.Add("English");
+        languageCombo.Items.Add("Deutsch");
+        languageCombo.SelectedIndex = Strings.Current == Language.German ? 1 : 0;
+        languageCombo.SelectedIndexChanged += LanguageCombo_SelectedIndexChanged;
+
+        gamePathLabel = new Label { Left = 12, Top = 50, Width = 90 };
+        gamePathBox = new TextBox { Left = 105, Top = 47, Width = 460, Text = Directory.Exists(DefaultGamePath) ? DefaultGamePath : "" };
+        browseButton = new Button { Left = 575, Top = 46, Width = 120 };
+        browseButton.Click += BrowseButton_Click;
+
+        bindingsList = new ListView
+        {
+            Left = 12,
+            Top = 85,
+            Width = 683,
+            Height = 340,
+            View = View.Details,
+            FullRowSelect = true,
+            MultiSelect = false,
+            HideSelection = false,
+        };
+        bindingsList.Columns.Add("", 660);
+        bindingsList.KeyDown += BindingsList_KeyDown;
+
+        rebindButton = new Button { Left = 12, Top = 435, Width = 150 };
+        rebindButton.Click += (_, _) => BeginRebind();
+
+        resetSelectedButton = new Button { Left = 170, Top = 435, Width = 190 };
+        resetSelectedButton.Click += ResetSelectedButton_Click;
+
+        defaultPresetButton = new Button { Left = 12, Top = 470, Width = 210 };
+        defaultPresetButton.Click += (_, _) => ApplyPreset(safe: false);
+
+        safePresetButton = new Button { Left = 230, Top = 470, Width = 280 };
+        safePresetButton.Click += (_, _) => ApplyPreset(safe: true);
+
+        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 100 };
+        dialogModeLabel = new Label { Left = 12, Top = 28, Width = 130 };
+        dialogModeCombo = new ComboBox { Left = 150, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
+        orbAnnouncementsCheck = new CheckBox { Left = 12, Top = 60, Width = 200 };
+        speechInterruptCheck = new CheckBox { Left = 230, Top = 60, Width = 220 };
+        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, speechInterruptCheck });
+
+        saveButton = new Button { Left = 12, Top = 620, Width = 150 };
+        saveButton.Click += SaveButton_Click;
+
+        statusLabel = new Label { Left = 170, Top = 625, Width = 525, Text = "" };
+
+        Controls.AddRange(new Control[]
+        {
+            languageLabel, languageCombo,
+            gamePathLabel, gamePathBox, browseButton,
+            bindingsList, rebindButton, resetSelectedButton,
+            defaultPresetButton, safePresetButton,
+            generalGroup, saveButton, statusLabel,
+        });
+
+        ApplyLocalization();
+
+        Load += (_, _) =>
+        {
+            Tolk.Initialize();
+            loaded = true;
+            LoadConfigFromDisk();
+        };
+        FormClosed += (_, _) => Tolk.Shutdown();
+    }
+
+    private void LanguageCombo_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        Strings.Current = languageCombo.SelectedIndex == 1 ? Language.German : Language.English;
+        ApplyLocalization();
+        if (loaded) RefreshBindingsList();
+    }
+
+    private void ApplyLocalization()
+    {
+        Text = Strings.Get("WindowTitle");
+        languageLabel.Text = Strings.Get("LanguageLabel");
+        gamePathLabel.Text = Strings.Get("GamePathLabel");
+        gamePathBox.AccessibleName = Strings.Get("GamePathAccessible");
+        browseButton.Text = Strings.Get("Browse");
+        bindingsList.AccessibleName = Strings.Get("BindingsListAccessible");
+        bindingsList.Columns[0].Text = Strings.Get("ColumnHeader");
+        rebindButton.Text = Strings.Get("Rebind");
+        resetSelectedButton.Text = Strings.Get("ResetSelected");
+        defaultPresetButton.Text = Strings.Get("PresetDefault");
+        safePresetButton.Text = Strings.Get("PresetSafe");
+        generalGroup.Text = Strings.Get("GeneralGroup");
+        dialogModeLabel.Text = Strings.Get("DialogModeLabel");
+        dialogModeCombo.AccessibleName = Strings.Get("DialogModeLabel");
+
+        var selectedDialogMode = dialogModeCombo.SelectedIndex;
+        dialogModeCombo.Items.Clear();
+        dialogModeCombo.Items.Add(Strings.Get("DialogModeOff"));
+        dialogModeCombo.Items.Add(Strings.Get("DialogModeFull"));
+        dialogModeCombo.Items.Add(Strings.Get("DialogModeSpeakerOnly"));
+        dialogModeCombo.SelectedIndex = selectedDialogMode >= 0 ? selectedDialogMode : 0;
+
+        orbAnnouncementsCheck.Text = Strings.Get("OrbAnnouncements");
+        orbAnnouncementsCheck.AccessibleName = Strings.Get("OrbAnnouncements");
+        speechInterruptCheck.Text = Strings.Get("SpeechInterrupt");
+        speechInterruptCheck.AccessibleName = Strings.Get("SpeechInterrupt");
+        saveButton.Text = Strings.Get("Save");
+        statusLabel.AccessibleName = Strings.Get("StatusAccessible");
+    }
+
+    private string ConfigPath => Path.Combine(gamePathBox.Text.Trim(), "UserData", "AccessibilityMod.cfg");
+
+    private void BrowseButton_Click(object? sender, EventArgs e)
+    {
+        using var dialog = new FolderBrowserDialog { Description = Strings.Get("BrowseDialogTitle") };
+        if (Directory.Exists(gamePathBox.Text)) dialog.SelectedPath = gamePathBox.Text;
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            gamePathBox.Text = dialog.SelectedPath;
+            LoadConfigFromDisk();
+        }
+    }
+
+    private void LoadConfigFromDisk()
+    {
+        if (!Directory.Exists(gamePathBox.Text.Trim()))
+        {
+            SetStatus(Strings.Get("StatusGamePathMissing"));
+            return;
+        }
+
+        config = ModConfig.LoadOrDefault(ConfigPath);
+        RefreshBindingsList();
+        dialogModeCombo.SelectedIndex = Math.Clamp(config.DialogReadingMode, 0, 2);
+        orbAnnouncementsCheck.Checked = config.OrbAnnouncements;
+        speechInterruptCheck.Checked = config.SpeechInterrupt;
+        SetStatus(File.Exists(ConfigPath) ? Strings.Get("StatusConfigLoaded") : Strings.Get("StatusConfigNotFound"));
+    }
+
+    private void RefreshBindingsList()
+    {
+        bindingsList.Items.Clear();
+        foreach (var action in GameKeyCatalog.Actions)
+        {
+            var item = new ListViewItem(RowText(action.Label, config.KeyBindings[action.Name])) { Tag = action.Name };
+            bindingsList.Items.Add(item);
+        }
+    }
+
+    // Screen readers announce a ListView row from its first column only - a second
+    // column with just the key never gets read when arrowing through rows. Putting both
+    // the action and its current key into the single column's text guarantees both get
+    // announced together.
+    private static string RowText(string label, string binding) => $"{label} — {DescribeBinding(binding)}";
+
+    private static string DescribeBinding(string binding)
+    {
+        var parts = binding.Split('|');
+        if (parts.Length != 4) return binding;
+
+        var mods = "";
+        if (parts[1] == "True") mods += Strings.Get("ModCtrl");
+        if (parts[2] == "True") mods += Strings.Get("ModAlt");
+        if (parts[3] == "True") mods += Strings.Get("ModShift");
+        return mods + KeyCodeMap.ToFriendly(parts[0]);
+    }
+
+    private void BeginRebind()
+    {
+        if (bindingsList.SelectedIndices.Count == 0)
+        {
+            SetStatus(Strings.Get("StatusSelectFirst"));
+            return;
+        }
+
+        capturingIndex = bindingsList.SelectedIndices[0];
+        SetStatus(Strings.Get("StatusPressKey"));
+    }
+
+    private void BindingsList_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (capturingIndex < 0) return;
+
+        e.Handled = true;
+        e.SuppressKeyPress = true;
+
+        var baseKey = e.KeyCode;
+        if (baseKey is Keys.ControlKey or Keys.ShiftKey or Keys.Menu or Keys.LWin or Keys.RWin)
+        {
+            return; // wait for a non-modifier key
+        }
+
+        if (baseKey == Keys.Escape)
+        {
+            SetStatus(Strings.Get("StatusRebindCancelled"));
+            capturingIndex = -1;
+            return;
+        }
+
+        var unityName = KeyCodeMap.ToUnityName(baseKey);
+        if (unityName == null)
+        {
+            SetStatus(Strings.Get("StatusKeyUnsupported", baseKey));
+            return;
+        }
+
+        var actionName = (string)bindingsList.Items[capturingIndex].Tag!;
+        var binding = $"{unityName}|{e.Control}|{e.Alt}|{e.Shift}";
+        config.KeyBindings[actionName] = binding;
+        var label = GameKeyCatalog.Actions.First(a => a.Name == actionName).Label;
+        bindingsList.Items[capturingIndex].Text = RowText(label, binding);
+        SetStatus(Strings.Get("StatusRebound", label, DescribeBinding(binding)));
+        capturingIndex = -1;
+    }
+
+    private void ResetSelectedButton_Click(object? sender, EventArgs e)
+    {
+        if (bindingsList.SelectedIndices.Count == 0)
+        {
+            SetStatus(Strings.Get("StatusSelectFirst"));
+            return;
+        }
+
+        var index = bindingsList.SelectedIndices[0];
+        var actionName = (string)bindingsList.Items[index].Tag!;
+        var action = GameKeyCatalog.Actions.First(a => a.Name == actionName);
+        config.KeyBindings[actionName] = action.DefaultBinding;
+        bindingsList.Items[index].Text = RowText(action.Label, action.DefaultBinding);
+        SetStatus(Strings.Get("StatusReset", action.Label));
+    }
+
+    private void ApplyPreset(bool safe)
+    {
+        foreach (var action in GameKeyCatalog.Actions)
+        {
+            config.KeyBindings[action.Name] = safe ? action.SafeBinding : action.DefaultBinding;
+        }
+        RefreshBindingsList();
+        SetStatus(safe ? Strings.Get("StatusSafePreset") : Strings.Get("StatusDefaultPreset"));
+    }
+
+    private void SaveButton_Click(object? sender, EventArgs e)
+    {
+        if (!Directory.Exists(gamePathBox.Text.Trim()))
+        {
+            SetStatus(Strings.Get("StatusGamePathMissing"));
+            return;
+        }
+
+        config.DialogReadingMode = dialogModeCombo.SelectedIndex;
+        config.OrbAnnouncements = orbAnnouncementsCheck.Checked;
+        config.SpeechInterrupt = speechInterruptCheck.Checked;
+
+        try
+        {
+            config.Save(ConfigPath);
+            SetStatus(Strings.Get("StatusSaved"));
+            MessageBox.Show(this, Strings.Get("StatusSaved"), Strings.Get("SaveDialogTitle"),
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            var message = Strings.Get("StatusSaveError", ex.Message);
+            SetStatus(message);
+            MessageBox.Show(this, message, Strings.Get("SaveDialogTitle"),
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void SetStatus(string message)
+    {
+        statusLabel.Text = message;
+        Tolk.Speak(message);
+    }
+}

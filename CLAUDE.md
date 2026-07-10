@@ -49,7 +49,11 @@ The mod follows a **modular system architecture** with clear separation of conce
 - **ObjectCategorizer.cs**: Classifies game objects (NPCs, locations, containers, etc.)
 
 ### Input Handling (mod/Input/)
-- **InputManager.cs**: Centralized keyboard input processing with accessibility hotkeys
+- **InputManager.cs**: Centralized keyboard input processing with accessibility hotkeys - dispatches via `KeyBindings.IsPressed(GameKey.X)` rather than hardcoded `UnityEngine.Input.GetKeyDown(KeyCode...)` calls
+
+### Settings (mod/Settings/)
+- **GameKey.cs / KeyBindings.cs**: Every hotkey is a remappable `GameKey`, persisted via MelonPreferences to `UserData/AccessibilityMod.cfg` (`[KeyBindings]` category, one `"UnityKeyCodeName|RequireCtrl|RequireAlt|RequireShift"` string per action). Two built-in presets: the original US-QWERTY punctuation bindings (`Defaults`), and a layout-independent alternative (`NumpadSafePreset`) that reuses stardew-access's conventions (Escape/PageUp/PageDown/Ctrl+Home) where an equivalent exists and falls back to the numpad for the rest - punctuation keys like `[`, `]`, `\` move or require AltGr on non-US layouts (e.g. German QWERTZ), which was the root cause of the mod being effectively unusable there.
+- **AccessibilityPreferences.cs**: Dialog reading mode / orb announcements / speech interrupt, same cfg file, `[AccessibilityMod]` category.
 
 ### UI Integration (mod/UI/)
 - **UINavigationHandler.cs**: Detects and announces UI element selection
@@ -74,6 +78,9 @@ The mod follows a **modular system architecture** with clear separation of conce
 ## Key Accessibility Features
 
 ### Navigation Hotkeys
+All hotkeys are remappable (see Settings above); this lists the two built-in presets.
+
+Default (original, US-QWERTY):
 - **[** - Select NPCs category
 - **]** - Select locations category  
 - **\\** - Select containers/loot category
@@ -85,6 +92,17 @@ The mod follows a **modular system architecture** with clear separation of conce
 - **'** - Distance-based scene scan
 - **`** - Announce current UI selection
 - **-** - Toggle dialog reading mode
+
+Layout-safe preset (recommended for non-US keyboards, or laptops without a numpad for the four navigation keys):
+- **Numpad 1/2/3/0** - Select NPCs/locations/loot/everything category
+- **Escape** - Stop automated movement
+- **Page Down / Page Up** - Cycle category forward/backward
+- **Ctrl+Home** - Navigate to selected object
+- **Numpad 7/8/6** - Full scene scan / distance scan / announce current selection
+- **Numpad -** - Toggle dialog reading mode
+
+### Keybind Editor Tool (tools/KeybindEditor)
+A standalone WinForms app (not part of the mod DLL) for editing `UserData/AccessibilityMod.cfg` without launching the game: pick a game folder, load a preset or freely rebind any action to any key, edit the dialog reading mode / orb announcements / speech interrupt settings, save. Localized (English/German). Requires the mod to have been built and installed at least once so its `GameKey` list conceptually matches (the tool's `GameKeyCatalog.cs` is a hand-kept mirror of `mod/Settings/KeyBindings.cs`'s `Defaults`/`NumpadSafePreset` - keep both in sync when adding/renaming a `GameKey`). Build: `cd tools/KeybindEditor && dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true`.
 
 ### Object Categories
 The system categorizes all interactable objects into logical groups:
