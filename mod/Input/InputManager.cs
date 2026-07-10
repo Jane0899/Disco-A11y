@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using AccessibilityMod.Navigation;
 using AccessibilityMod.UI;
 using AccessibilityMod.Patches;
+using AccessibilityMod.Settings;
 using MelonLoader;
 
 namespace AccessibilityMod.Input
@@ -61,126 +62,131 @@ namespace AccessibilityMod.Input
                 return;
             }
 
-            // On-demand current selection announcement: Grave/Tilde key (`)
-            if (UnityEngine.Input.GetKeyDown(KeyCode.BackQuote))
+            // On-demand current selection announcement
+            if (KeyBindings.IsPressed(GameKey.AnnounceCurrentSelection))
             {
                 AnnounceCurrentSelection();
             }
-            
-            // Toggle sorting mode: Semicolon (;) - toggles between distance and directional sorting
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Semicolon))
+
+            // Toggle sorting mode - toggles between distance and directional sorting
+            if (KeyBindings.IsPressed(GameKey.ToggleSortingMode))
             {
                 navigationSystem.ToggleSortingMode();
             }
-            
-            // Distance-based scene scanner: Quote (')
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Quote))
+
+            // Distance-based scene scanner
+            if (KeyBindings.IsPressed(GameKey.ScanSceneByDistance))
             {
                 navigationSystem.ScanSceneByDistance();
             }
-            
-            bool leftBracketDown = UnityEngine.Input.GetKeyDown(KeyCode.LeftBracket);
-            bool rightBracketDown = UnityEngine.Input.GetKeyDown(KeyCode.RightBracket);
-            bool ctrlHeld = UnityEngine.Input.GetKey(KeyCode.LeftControl) || UnityEngine.Input.GetKey(KeyCode.RightControl);
-            bool altHeld = UnityEngine.Input.GetKey(KeyCode.LeftAlt) || UnityEngine.Input.GetKey(KeyCode.RightAlt);
 
-            bool backslashDown = UnityEngine.Input.GetKeyDown(KeyCode.Backslash);
-            bool equalsDown = UnityEngine.Input.GetKeyDown(KeyCode.Equals);
-
-            // Category selection keys (safe punctuation) + modifiers for waypoints
-            if (leftBracketDown)
+            // Category selection keys + modifiers for waypoints. Several GameKeys can
+            // share the same physical key (e.g. SelectNpcs / FocusWaypoints / CreateWaypoint
+            // all default to LeftBracket) - KeyBindings.IsPressed only returns true for the
+            // one whose modifier requirement exactly matches what's currently held, so no
+            // explicit priority order is needed here.
+            if (KeyBindings.IsPressed(GameKey.CreateWaypoint))
             {
-                if (altHeld)
-                    navigationSystem.StartWaypointCreation();
-                else if (ctrlHeld)
-                    navigationSystem.FocusWaypoints();
-                else if (navigationSystem.IsWaypointFocus)
+                navigationSystem.StartWaypointCreation();
+            }
+            else if (KeyBindings.IsPressed(GameKey.FocusWaypoints))
+            {
+                navigationSystem.FocusWaypoints();
+            }
+            else if (KeyBindings.IsPressed(GameKey.SelectNpcs))
+            {
+                if (navigationSystem.IsWaypointFocus)
                     navigationSystem.SelectWaypointCategory(WaypointCategory.NPCs);
                 else
                     navigationSystem.SelectCategory(ObjectCategory.NPCs);
             }
-            else if (rightBracketDown)  // ]
+            else if (KeyBindings.IsPressed(GameKey.DeleteWaypoint))
             {
-                if (altHeld)
-                    navigationSystem.DeleteCurrentWaypoint();
-                else if (navigationSystem.IsWaypointFocus)
+                navigationSystem.DeleteCurrentWaypoint();
+            }
+            else if (KeyBindings.IsPressed(GameKey.SelectLocations))
+            {
+                if (navigationSystem.IsWaypointFocus)
                     navigationSystem.SelectWaypointCategory(WaypointCategory.Locations);
                 else
                     navigationSystem.SelectCategory(ObjectCategory.Locations);
             }
-            else if (backslashDown)  // \
+            else if (KeyBindings.IsPressed(GameKey.SelectLoot))
             {
                 if (navigationSystem.IsWaypointFocus)
-                    TolkScreenReader.Instance.Speak("Press left bracket for NPC waypoints, right bracket for locations, or equals for all.", true);
+                    TolkScreenReader.Instance.Speak("Press the NPC waypoints key for NPC waypoints, the locations key for locations, or the everything key for all.", true);
                 else
                     navigationSystem.SelectCategory(ObjectCategory.Loot);
             }
-            else if (equalsDown)  // =
+            else if (KeyBindings.IsPressed(GameKey.SelectEverything))
             {
                 if (navigationSystem.IsWaypointFocus)
                     navigationSystem.SelectWaypointCategory(null);  // null = all
                 else
                     navigationSystem.SelectCategory(ObjectCategory.Everything);
             }
-            
-            // Cycle within current category: Period (.) forward, Shift+Period backward
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Period))
+
+            // Cycle within current category: forward / backward
+            if (KeyBindings.IsPressed(GameKey.CycleForward))
             {
-                bool shiftHeld = UnityEngine.Input.GetKey(KeyCode.LeftShift) || UnityEngine.Input.GetKey(KeyCode.RightShift);
-                navigationSystem.CycleWithinCategory(backward: shiftHeld);
+                navigationSystem.CycleWithinCategory(backward: false);
             }
-            
-            // Navigate to selected object: Comma (,)
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Comma))
+            else if (KeyBindings.IsPressed(GameKey.CycleBackward))
+            {
+                navigationSystem.CycleWithinCategory(backward: true);
+            }
+
+            // Navigate to selected object
+            if (KeyBindings.IsPressed(GameKey.NavigateToSelected))
             {
                 navigationSystem.NavigateToSelectedObject();
             }
-            
-            // Stop automated movement: Slash (/)
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Slash))
+
+            // Stop automated movement
+            if (KeyBindings.IsPressed(GameKey.StopMovement))
             {
                 navigationSystem.StopMovement();
             }
-            
-            // Toggle dialog reading mode: Minus/Hyphen (-)
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Minus))
+
+            // Toggle dialog reading mode
+            if (KeyBindings.IsPressed(GameKey.ToggleDialogReading))
             {
                 DialogStateManager.ToggleDialogReading();
             }
 
-            // Repeat last dialogue line: R key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.R))
+            // Repeat last dialogue line
+            if (KeyBindings.IsPressed(GameKey.RepeatDialogue))
             {
                 string lastDialogue = DialogSystemPatches.GetLastDialogueLine();
                 TolkScreenReader.Instance.Speak(lastDialogue, true, AnnouncementCategory.Immediate);
             }
 
-            // Toggle orb announcements: Zero (0)
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha0))
+            // Toggle orb announcements
+            if (KeyBindings.IsPressed(GameKey.ToggleOrbAnnouncements))
             {
                 OrbTextVocalizationPatches.ToggleOrbAnnouncements();
             }
 
-            // Character status announcement: H key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.H))
+            // Character status announcement
+            if (KeyBindings.IsPressed(GameKey.AnnounceStatus))
             {
                 Patches.CharacterStatusAnnouncement.AnnounceFullStatus();
             }
 
-            // Character stats announcement (time, money, experience): X key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.X))
+            // Character stats announcement (time, money, experience)
+            if (KeyBindings.IsPressed(GameKey.AnnounceStats))
             {
                 Patches.CharacterStatsAnnouncement.AnnounceCharacterStats();
             }
 
-            // Toggle speech interrupt mode: 8 key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha8))
+            // Toggle speech interrupt mode
+            if (KeyBindings.IsPressed(GameKey.ToggleSpeechInterrupt))
             {
                 TolkScreenReader.Instance.ToggleGlobalInterrupt();
             }
 
-            // Toggle encoding diagnostic logging: Ctrl+9
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha9) && ctrlHeld)
+            // Toggle encoding diagnostic logging
+            if (KeyBindings.IsPressed(GameKey.ToggleDiagnostics))
             {
                 bool newState = !TextExtractor.DiagnosticLogging;
                 TextExtractor.DiagnosticLogging = newState;
@@ -190,20 +196,20 @@ namespace AccessibilityMod.Input
                 MelonLogger.Msg($"[DIAG] Encoding diagnostic logging {status}");
             }
 
-            // Officer profile announcement: O key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.O))
+            // Officer profile announcement
+            if (KeyBindings.IsPressed(GameKey.AnnounceOfficerProfile))
             {
                 Patches.OfficerProfileAnnouncement.AnnounceOfficerProfile();
             }
 
-            // Read skill description in character sheet: N key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.N))
+            // Read skill description in character sheet
+            if (KeyBindings.IsPressed(GameKey.ReadSkillDescription))
             {
                 SkillDescriptionReader.ReadSelectedSkillDescription();
             }
 
-            // Check Kim dialogue status: K key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.K))
+            // Check Kim dialogue status
+            if (KeyBindings.IsPressed(GameKey.AnnounceKimStatus))
             {
                 AnnounceKimDialogueStatus();
             }

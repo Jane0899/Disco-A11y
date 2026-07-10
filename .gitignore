@@ -5,7 +5,12 @@ disco/
 *.pdb
 mod/bin/
 mod/obj/
+tools/**/bin/
+tools/**/obj/
 release/
+
+# Vendored native dependency, not a build artifact - keep despite the *.dll rule above.
+!tools/KeybindEditor/TolkNative/*.dll
 
 # Visual Studio solution files
 *.sln

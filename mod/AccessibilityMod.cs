@@ -27,6 +27,7 @@ namespace AccessibilityMod
 
             // Initialize preferences
             AccessibilityPreferences.Initialize();
+            KeyBindings.Initialize();
 
             // Initialize Harmony patches
             try
