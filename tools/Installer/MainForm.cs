@@ -126,6 +126,8 @@ public sealed class MainForm : Form
             var tag = await ModInstaller.InstallLatestAsync(gamePath, Log);
             Log($"[{tag}] " + Strings.Get("StepDone"));
 
+            CreateStartMenuShortcut(gamePath);
+
             Tolk.Speak(Strings.Get("InstallCompleteDialog"));
             MessageBox.Show(this, Strings.Get("InstallCompleteDialog"), Strings.Get("DialogTitle"),
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -146,13 +148,7 @@ public sealed class MainForm : Form
 
     private void OpenKeybindEditorButton_Click(object? sender, EventArgs e)
     {
-        var candidates = new[]
-        {
-            Path.Combine(AppContext.BaseDirectory, "DiscoElysiumKeybindEditor.exe"),
-            Path.Combine(AppContext.BaseDirectory, "..", "KeybindEditor", "DiscoElysiumKeybindEditor.exe"),
-        };
-
-        var exe = candidates.FirstOrDefault(File.Exists);
+        var exe = KeybindEditorLocator.Find();
         if (exe == null)
         {
             Log(Strings.Get("KeybindEditorNotFound"));
@@ -161,7 +157,28 @@ public sealed class MainForm : Form
             return;
         }
 
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true });
+        var gamePath = gamePathBox.Text.Trim();
+        var args = GamePathFinder.IsValid(gamePath) ? $"\"{gamePath}\"" : "";
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe)
+        {
+            UseShellExecute = true,
+            Arguments = args,
+            WorkingDirectory = Path.GetDirectoryName(exe),
+        });
+    }
+
+    private void CreateStartMenuShortcut(string gamePath)
+    {
+        var exe = KeybindEditorLocator.Find();
+        if (exe == null)
+        {
+            Log(Strings.Get("StepShortcutSkipped"));
+            return;
+        }
+
+        Log(StartMenuShortcut.TryCreate(gamePath, exe, out var result)
+            ? Strings.Get("StepShortcutCreated", result)
+            : Strings.Get("StepShortcutFailed", result));
     }
 
     private void Log(string message)

@@ -48,6 +48,12 @@ public static class Strings
         ["ReinstallPromptText"] = ("MelonLoader is already installed. Reinstall it anyway?", "MelonLoader ist bereits installiert. Trotzdem neu installieren?"),
 
         ["KeybindEditorNotFound"] = ("Keybind Editor not found next to this installer. Build tools/KeybindEditor first.", "Tastenbelegungs-Editor liegt nicht neben diesem Installer. Bitte zuerst tools/KeybindEditor bauen."),
+
+        ["ShortcutFileName"] = ("Disco Elysium - Accessibility Mod Configure Keybinds", "Disco Elysium - Accessibility Mod Tastenbelegung konfigurieren"),
+        ["ShortcutDescription"] = ("Configure the Disco Elysium Accessibility Mod's keybinds", "Tastenbelegung des Disco Elysium Accessibility Mod konfigurieren"),
+        ["StepShortcutCreated"] = ("Start Menu shortcut created: {0}", "Startmenü-Verknüpfung erstellt: {0}"),
+        ["StepShortcutFailed"] = ("Could not create Start Menu shortcut: {0}", "Startmenü-Verknüpfung konnte nicht erstellt werden: {0}"),
+        ["StepShortcutSkipped"] = ("Keybind Editor not found - skipping Start Menu shortcut.", "Tastenbelegungs-Editor nicht gefunden - Startmenü-Verknüpfung übersprungen."),
     };
 
     public static string Get(string key) => Current == Language.German ? Table[key].De : Table[key].En;

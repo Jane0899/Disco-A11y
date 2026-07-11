@@ -51,6 +51,15 @@ internal static class Program
 
             var tag = await ModInstaller.InstallLatestAsync(gamePath, Log);
             Log($"Mod installed (release {tag}).");
+
+            var exe = KeybindEditorLocator.Find();
+            if (exe != null)
+            {
+                Log(StartMenuShortcut.TryCreate(gamePath, exe, out var result)
+                    ? $"Start Menu shortcut created: {result}"
+                    : $"Could not create Start Menu shortcut: {result}");
+            }
+
             Log("Done. Launch the game to use the mod.");
         }
         catch (Exception ex)

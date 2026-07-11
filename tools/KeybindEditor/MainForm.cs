@@ -28,7 +28,7 @@ public sealed class MainForm : Form
     private int capturingIndex = -1;
     private bool loaded;
 
-    public MainForm()
+    public MainForm(string? initialGamePath = null)
     {
         Width = 720;
         Height = 640;
@@ -43,7 +43,8 @@ public sealed class MainForm : Form
         languageCombo.SelectedIndexChanged += LanguageCombo_SelectedIndexChanged;
 
         gamePathLabel = new Label { Left = 12, Top = 50, Width = 90 };
-        gamePathBox = new TextBox { Left = 105, Top = 47, Width = 460, Text = Directory.Exists(DefaultGamePath) ? DefaultGamePath : "" };
+        var startPath = initialGamePath ?? (Directory.Exists(DefaultGamePath) ? DefaultGamePath : "");
+        gamePathBox = new TextBox { Left = 105, Top = 47, Width = 460, Text = startPath };
         browseButton = new Button { Left = 575, Top = 46, Width = 120 };
         browseButton.Click += BrowseButton_Click;
 
