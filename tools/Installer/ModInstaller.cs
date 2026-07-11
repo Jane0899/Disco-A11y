@@ -101,7 +101,11 @@ public static class ModInstaller
             var userDataDest = Path.Combine(gamePath, "UserData");
             Directory.CreateDirectory(userDataDest);
             statusCallback?.Invoke(Strings.Get("StepCopying", "UserData"));
-            CopyDirectory(userDataSource, userDataDest);
+            // Never overwrite: UserData holds the player's own keybinds/waypoints/settings
+            // once the mod has run. Only seed files that don't exist yet (first install),
+            // so reinstalling/updating never clobbers real progress with the release's
+            // bundled defaults.
+            CopyDirectory(userDataSource, userDataDest, overwrite: false);
         }
     }
 
@@ -112,16 +116,20 @@ public static class ModInstaller
         File.Copy(source, dest, overwrite: true);
     }
 
-    private static void CopyDirectory(string sourceDir, string destDir)
+    private static void CopyDirectory(string sourceDir, string destDir, bool overwrite)
     {
         Directory.CreateDirectory(destDir);
         foreach (var file in Directory.GetFiles(sourceDir))
         {
-            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), overwrite: true);
+            var dest = Path.Combine(destDir, Path.GetFileName(file));
+            if (overwrite || !File.Exists(dest))
+            {
+                File.Copy(file, dest, overwrite: true);
+            }
         }
         foreach (var subDir in Directory.GetDirectories(sourceDir))
         {
-            CopyDirectory(subDir, Path.Combine(destDir, Path.GetFileName(subDir)));
+            CopyDirectory(subDir, Path.Combine(destDir, Path.GetFileName(subDir)), overwrite);
         }
     }
 }

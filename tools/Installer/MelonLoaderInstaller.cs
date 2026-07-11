@@ -22,18 +22,19 @@ public static class MelonLoaderInstaller
 
     public static async Task InstallAsync(string gamePath, string gameExePath, Action<string>? statusCallback = null)
     {
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DiscoElysiumInstaller/1.0");
+
         var assetName = DetectAssetName(gamePath, gameExePath);
-        var (downloadUrl, tag) = await ResolveDownloadUrlAsync(assetName, statusCallback);
+        var (downloadUrl, tag) = await ResolveDownloadUrlAsync(httpClient, assetName, statusCallback);
 
         statusCallback?.Invoke(Strings.Get("StepMelonLoaderInstalling", tag, assetName));
 
         var tempZip = Path.Combine(Path.GetTempPath(), assetName);
         try
         {
-            using (var httpClient = new HttpClient())
+            using (var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
             {
-                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DiscoElysiumInstaller/1.0");
-                using var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
                 response.EnsureSuccessStatusCode();
                 await using var contentStream = await response.Content.ReadAsStreamAsync();
                 await using var fileStream = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -89,15 +90,14 @@ public static class MelonLoaderInstaller
         }
     }
 
-    private static async Task<(string Url, string Tag)> ResolveDownloadUrlAsync(string assetName, Action<string>? statusCallback)
+    private static async Task<(string Url, string Tag)> ResolveDownloadUrlAsync(HttpClient httpClient, string assetName, Action<string>? statusCallback)
     {
         try
         {
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DiscoElysiumInstaller/1.0");
-            httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            using var request = new HttpRequestMessage(HttpMethod.Get, LatestReleaseApiUrl);
+            request.Headers.Accept.ParseAdd("application/vnd.github+json");
 
-            using var response = await httpClient.GetAsync(LatestReleaseApiUrl);
+            using var response = await httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             using var stream = await response.Content.ReadAsStreamAsync();

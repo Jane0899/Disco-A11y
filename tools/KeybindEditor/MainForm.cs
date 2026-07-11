@@ -13,6 +13,7 @@ public sealed class MainForm : Form
     private readonly Button browseButton;
     private readonly ListView bindingsList;
     private readonly Button rebindButton;
+    private readonly Button cancelRebindButton;
     private readonly Button resetSelectedButton;
     private readonly Button defaultPresetButton;
     private readonly Button safePresetButton;
@@ -65,7 +66,10 @@ public sealed class MainForm : Form
         rebindButton = new Button { Left = 12, Top = 435, Width = 150 };
         rebindButton.Click += (_, _) => BeginRebind();
 
-        resetSelectedButton = new Button { Left = 170, Top = 435, Width = 190 };
+        cancelRebindButton = new Button { Left = 170, Top = 435, Width = 120, Enabled = false };
+        cancelRebindButton.Click += (_, _) => CancelRebind();
+
+        resetSelectedButton = new Button { Left = 300, Top = 435, Width = 190 };
         resetSelectedButton.Click += ResetSelectedButton_Click;
 
         defaultPresetButton = new Button { Left = 12, Top = 470, Width = 210 };
@@ -90,7 +94,7 @@ public sealed class MainForm : Form
         {
             languageLabel, languageCombo,
             gamePathLabel, gamePathBox, browseButton,
-            bindingsList, rebindButton, resetSelectedButton,
+            bindingsList, rebindButton, cancelRebindButton, resetSelectedButton,
             defaultPresetButton, safePresetButton,
             generalGroup, saveButton, statusLabel,
         });
@@ -123,6 +127,7 @@ public sealed class MainForm : Form
         bindingsList.AccessibleName = Strings.Get("BindingsListAccessible");
         bindingsList.Columns[0].Text = Strings.Get("ColumnHeader");
         rebindButton.Text = Strings.Get("Rebind");
+        cancelRebindButton.Text = Strings.Get("CancelRebind");
         resetSelectedButton.Text = Strings.Get("ResetSelected");
         defaultPresetButton.Text = Strings.Get("PresetDefault");
         safePresetButton.Text = Strings.Get("PresetSafe");
@@ -211,7 +216,20 @@ public sealed class MainForm : Form
         }
 
         capturingIndex = bindingsList.SelectedIndices[0];
+        cancelRebindButton.Enabled = true;
         SetStatus(Strings.Get("StatusPressKey"));
+    }
+
+    // Capturing is cancelled via this dedicated button (or by starting a rebind on a
+    // different row) rather than via the Escape key, so Escape itself stays assignable
+    // like any other key through the capture flow below.
+    private void CancelRebind()
+    {
+        if (capturingIndex < 0) return;
+
+        capturingIndex = -1;
+        cancelRebindButton.Enabled = false;
+        SetStatus(Strings.Get("StatusRebindCancelled"));
     }
 
     private void BindingsList_KeyDown(object? sender, KeyEventArgs e)
@@ -227,13 +245,6 @@ public sealed class MainForm : Form
             return; // wait for a non-modifier key
         }
 
-        if (baseKey == Keys.Escape)
-        {
-            SetStatus(Strings.Get("StatusRebindCancelled"));
-            capturingIndex = -1;
-            return;
-        }
-
         var unityName = KeyCodeMap.ToUnityName(baseKey);
         if (unityName == null)
         {
@@ -243,11 +254,21 @@ public sealed class MainForm : Form
 
         var actionName = (string)bindingsList.Items[capturingIndex].Tag!;
         var binding = $"{unityName}|{e.Control}|{e.Alt}|{e.Shift}";
+
+        var conflict = config.KeyBindings.FirstOrDefault(kvp => kvp.Key != actionName && kvp.Value == binding);
+        if (conflict.Key != null)
+        {
+            var conflictLabel = GameKeyCatalog.Actions.First(a => a.Name == conflict.Key).Label;
+            SetStatus(Strings.Get("StatusRebindConflict", DescribeBinding(binding), conflictLabel));
+            return; // stay in capture mode so the user can try a different key
+        }
+
         config.KeyBindings[actionName] = binding;
         var label = GameKeyCatalog.Actions.First(a => a.Name == actionName).Label;
         bindingsList.Items[capturingIndex].Text = RowText(label, binding);
         SetStatus(Strings.Get("StatusRebound", label, DescribeBinding(binding)));
         capturingIndex = -1;
+        cancelRebindButton.Enabled = false;
     }
 
     private void ResetSelectedButton_Click(object? sender, EventArgs e)

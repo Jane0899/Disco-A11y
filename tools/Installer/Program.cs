@@ -7,7 +7,10 @@ internal static class Program
     {
         if (args.Length >= 1 && args[0] == "--cli")
         {
-            var gamePathArg = args.Length >= 2 && !args[1].StartsWith("--") ? args[1] : null;
+            // The game path can be any non-flag argument after --cli, not just args[1] -
+            // otherwise a flag placed before the path (e.g. "--cli --force <path>") would
+            // silently discard the path in favor of auto-detection.
+            var gamePathArg = args.Skip(1).FirstOrDefault(a => !a.StartsWith("--"));
             var force = args.Contains("--force");
             RunCli(gamePathArg, force).GetAwaiter().GetResult();
             return;
@@ -58,6 +61,10 @@ internal static class Program
                 Log(StartMenuShortcut.TryCreate(gamePath, exe, out var result)
                     ? $"Start Menu shortcut created: {result}"
                     : $"Could not create Start Menu shortcut: {result}");
+            }
+            else
+            {
+                Log("Keybind Editor not found next to this installer - skipping Start Menu shortcut.");
             }
 
             Log("Done. Launch the game to use the mod.");

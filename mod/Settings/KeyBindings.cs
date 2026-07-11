@@ -25,17 +25,16 @@ namespace AccessibilityMod.Settings
         public static KeyBinding Deserialize(string value, KeyBinding fallback)
         {
             var parts = value?.Split('|');
-            if (parts == null || parts.Length != 4 || !Enum.TryParse<KeyCode>(parts[0], out var key))
+            if (parts == null || parts.Length != 4
+                || !Enum.TryParse<KeyCode>(parts[0], out var key)
+                || !bool.TryParse(parts[1], out var ctrl)
+                || !bool.TryParse(parts[2], out var alt)
+                || !bool.TryParse(parts[3], out var shift))
             {
                 return fallback;
             }
 
-            return new KeyBinding(
-                key,
-                bool.TryParse(parts[1], out var ctrl) && ctrl,
-                bool.TryParse(parts[2], out var alt) && alt,
-                bool.TryParse(parts[3], out var shift) && shift
-            );
+            return new KeyBinding(key, ctrl, alt, shift);
         }
 
         public string Describe()
@@ -188,11 +187,17 @@ namespace AccessibilityMod.Settings
         }
 
         /// <summary>
-        /// True on the frame the action's bound key was pressed, with exactly the
-        /// required modifier state (no more, no less) - this is what lets several
-        /// GameKeys share the same base key (e.g. SelectNpcs / FocusWaypoints /
-        /// CreateWaypoint can all sit on LeftBracket, disambiguated by modifiers)
-        /// without an explicit priority order.
+        /// True on the frame the action's bound key was pressed, with at least the
+        /// binding's own required modifiers held - an unrelated extra modifier held for
+        /// some other reason (resting a hand on Ctrl, Sticky Keys, etc.) doesn't block an
+        /// otherwise-unmodified hotkey, matching how these hotkeys behaved before they
+        /// were made remappable. Where several GameKeys share a physical key with
+        /// different modifier requirements (e.g. SelectNpcs / FocusWaypoints /
+        /// CreateWaypoint can all sit on LeftBracket), this alone doesn't disambiguate
+        /// them when more modifiers are held than the least-specific binding needs - the
+        /// caller's if/else-if chain must check the more specific (more required
+        /// modifiers) binding first so ties resolve to the more specific action, exactly
+        /// as the original hardcoded chain did. See InputManager.HandleInput.
         /// </summary>
         public static bool IsPressed(GameKey action)
         {
@@ -206,7 +211,7 @@ namespace AccessibilityMod.Settings
             bool alt = UnityEngine.Input.GetKey(KeyCode.LeftAlt) || UnityEngine.Input.GetKey(KeyCode.RightAlt);
             bool shift = UnityEngine.Input.GetKey(KeyCode.LeftShift) || UnityEngine.Input.GetKey(KeyCode.RightShift);
 
-            return ctrl == binding.RequireCtrl && alt == binding.RequireAlt && shift == binding.RequireShift;
+            return (!binding.RequireCtrl || ctrl) && (!binding.RequireAlt || alt) && (!binding.RequireShift || shift);
         }
     }
 }

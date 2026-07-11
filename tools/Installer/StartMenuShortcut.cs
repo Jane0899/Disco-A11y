@@ -14,7 +14,13 @@ public static class StartMenuShortcut
     {
         try
         {
-            var folderName = Path.GetFileName(gamePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            // Trim trailing separators: besides normalizing the folder-name lookup below,
+            // a trailing backslash immediately before the closing quote in Arguments would
+            // escape that quote per Windows command-line parsing rules and corrupt the
+            // argument the launched Keybind Editor receives.
+            gamePath = gamePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            var folderName = Path.GetFileName(gamePath);
             if (string.IsNullOrWhiteSpace(folderName)) folderName = "Disco Elysium";
 
             var startMenuDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), folderName);

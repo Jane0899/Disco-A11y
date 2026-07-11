@@ -126,14 +126,18 @@ namespace AccessibilityMod.Input
                     navigationSystem.SelectCategory(ObjectCategory.Everything);
             }
 
-            // Cycle within current category: forward / backward
-            if (KeyBindings.IsPressed(GameKey.CycleForward))
-            {
-                navigationSystem.CycleWithinCategory(backward: false);
-            }
-            else if (KeyBindings.IsPressed(GameKey.CycleBackward))
+            // Cycle within current category: forward / backward. CycleBackward is checked
+            // first because it's the more specific binding (requires Shift by default) -
+            // KeyBindings.IsPressed tolerates extra modifiers, so if CycleForward (no
+            // required modifiers) were checked first it would also match while Shift is
+            // held and CycleBackward would never fire.
+            if (KeyBindings.IsPressed(GameKey.CycleBackward))
             {
                 navigationSystem.CycleWithinCategory(backward: true);
+            }
+            else if (KeyBindings.IsPressed(GameKey.CycleForward))
+            {
+                navigationSystem.CycleWithinCategory(backward: false);
             }
 
             // Navigate to selected object
