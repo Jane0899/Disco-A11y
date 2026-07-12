@@ -56,6 +56,8 @@ namespace AccessibilityMod.Navigation
         private void OnArrived(string _)
         {
             if (!lastNavigationTargetWasObject) return;
+
+            TutorialGuide.OnArrivalAtObject();
             if (!AccessibilityPreferences.GetAutoInteract()) return;
 
             InteractWithSelectedObject();

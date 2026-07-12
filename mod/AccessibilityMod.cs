@@ -35,6 +35,7 @@ namespace AccessibilityMod
             // Initialize preferences
             AccessibilityPreferences.Initialize();
             KeyBindings.Initialize();
+            TutorialGuide.Initialize();
 
             // Initialize Harmony patches
             try
@@ -133,6 +134,9 @@ namespace AccessibilityMod
 
                 // Auto-advance dialogue once the current line finished speaking
                 DialogAutoAdvance.Update();
+
+                // Contextual one-shot tutorial tips
+                TutorialGuide.Update();
 
                 // Update movement monitoring
                 navigationSystem.UpdateMovement();

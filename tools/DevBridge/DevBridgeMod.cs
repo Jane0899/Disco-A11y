@@ -234,6 +234,37 @@ namespace DevBridge
                     if (nav == null) return "navigation system not ready";
                     return nav.GetNavigationInfo().FormatAnnouncement();
 
+                case "buttons":
+                {
+                    var sb = new StringBuilder();
+                    foreach (var b in UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.Button>())
+                    {
+                        if (b == null || !b.gameObject.activeInHierarchy || !b.interactable) continue;
+                        var label = b.GetComponentInChildren<Il2CppTMPro.TextMeshProUGUI>();
+                        var text = label != null && !string.IsNullOrWhiteSpace(label.text) ? label.text.Trim() : b.gameObject.name;
+                        sb.AppendLine(text);
+                    }
+                    return sb.Length == 0 ? "(no interactable buttons)" : sb.ToString().TrimEnd();
+                }
+
+                case "click":
+                {
+                    if (parts.Length < 2) return "usage: click <button label substring>";
+                    var needle = string.Join(" ", parts.Skip(1)).ToLowerInvariant();
+                    foreach (var b in UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.Button>())
+                    {
+                        if (b == null || !b.gameObject.activeInHierarchy || !b.interactable) continue;
+                        var label = b.GetComponentInChildren<Il2CppTMPro.TextMeshProUGUI>();
+                        var text = label != null && !string.IsNullOrWhiteSpace(label.text) ? label.text.Trim() : b.gameObject.name;
+                        if (text.ToLowerInvariant().Contains(needle))
+                        {
+                            b.onClick.Invoke();
+                            return $"clicked: {text}";
+                        }
+                    }
+                    return $"no button matching '{needle}'";
+                }
+
                 case "dialog":
                     return $"inConversation: {DialogStateManager.IsInConversation()}\nlastLine: {DialogSystemPatches.GetLastDialogueLine()}";
 

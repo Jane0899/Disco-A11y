@@ -12,6 +12,8 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Entry<bool> speakAudioCaptionsEntry;
         private static MelonPreferences_Entry<bool> dialogAutoAdvanceEntry;
         private static MelonPreferences_Entry<bool> autoInteractEntry;
+        private static MelonPreferences_Entry<bool> tutorialTipsEntry;
+        private static MelonPreferences_Entry<string> languageEntry;
 
         public static void Initialize()
         {
@@ -35,6 +37,12 @@ namespace AccessibilityMod.Settings
 
             autoInteractEntry = category.CreateEntry<bool>("AutoInteract", false,
                 "Automatically interact with the target object after auto-walk arrives");
+
+            tutorialTipsEntry = category.CreateEntry<bool>("TutorialTips", true,
+                "Play contextual one-time tutorial tips");
+
+            languageEntry = category.CreateEntry<string>("Language", "auto",
+                "Language for localized announcements: auto, en, de");
 
             MelonLogger.Msg($"[PREFERENCES] Initialized - Dialog: {GetDialogMode()}, Orbs: {GetOrbAnnouncements()}, Interrupt: {GetSpeechInterrupt()}, AudioCaptions: {GetSpeakAudioCaptions()}");
         }
@@ -98,6 +106,10 @@ namespace AccessibilityMod.Settings
             autoInteractEntry.Value = enabled;
             category.SaveToFile();
         }
+
+        public static bool GetTutorialTips() => tutorialTipsEntry.Value;
+
+        public static string GetLanguage() => languageEntry.Value;
 
         public static void SetSpeakAudioCaptions(bool enabled)
         {
