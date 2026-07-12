@@ -22,6 +22,7 @@ public sealed class MainForm : Form
     private readonly ComboBox dialogModeCombo;
     private readonly CheckBox orbAnnouncementsCheck;
     private readonly CheckBox speechInterruptCheck;
+    private readonly CheckBox speakAudioCaptionsCheck;
     private readonly Button saveButton;
     private readonly Label statusLabel;
 
@@ -83,7 +84,8 @@ public sealed class MainForm : Form
         dialogModeCombo = new ComboBox { Left = 150, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
         orbAnnouncementsCheck = new CheckBox { Left = 12, Top = 60, Width = 200 };
         speechInterruptCheck = new CheckBox { Left = 230, Top = 60, Width = 220 };
-        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, speechInterruptCheck });
+        speakAudioCaptionsCheck = new CheckBox { Left = 460, Top = 60, Width = 210 };
+        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, speechInterruptCheck, speakAudioCaptionsCheck });
 
         saveButton = new Button { Left = 12, Top = 620, Width = 150 };
         saveButton.Click += SaveButton_Click;
@@ -146,6 +148,8 @@ public sealed class MainForm : Form
         orbAnnouncementsCheck.AccessibleName = Strings.Get("OrbAnnouncements");
         speechInterruptCheck.Text = Strings.Get("SpeechInterrupt");
         speechInterruptCheck.AccessibleName = Strings.Get("SpeechInterrupt");
+        speakAudioCaptionsCheck.Text = Strings.Get("SpeakAudioCaptions");
+        speakAudioCaptionsCheck.AccessibleName = Strings.Get("SpeakAudioCaptions");
         saveButton.Text = Strings.Get("Save");
         statusLabel.AccessibleName = Strings.Get("StatusAccessible");
     }
@@ -176,6 +180,7 @@ public sealed class MainForm : Form
         dialogModeCombo.SelectedIndex = Math.Clamp(config.DialogReadingMode, 0, 2);
         orbAnnouncementsCheck.Checked = config.OrbAnnouncements;
         speechInterruptCheck.Checked = config.SpeechInterrupt;
+        speakAudioCaptionsCheck.Checked = config.SpeakAudioCaptions;
         SetStatus(File.Exists(ConfigPath) ? Strings.Get("StatusConfigLoaded") : Strings.Get("StatusConfigNotFound"));
     }
 
@@ -308,6 +313,7 @@ public sealed class MainForm : Form
         config.DialogReadingMode = dialogModeCombo.SelectedIndex;
         config.OrbAnnouncements = orbAnnouncementsCheck.Checked;
         config.SpeechInterrupt = speechInterruptCheck.Checked;
+        config.SpeakAudioCaptions = speakAudioCaptionsCheck.Checked;
 
         try
         {

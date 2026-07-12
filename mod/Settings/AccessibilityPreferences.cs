@@ -9,6 +9,7 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Entry<int> dialogModeEntry;
         private static MelonPreferences_Entry<bool> orbAnnouncementsEntry;
         private static MelonPreferences_Entry<bool> speechInterruptEntry;
+        private static MelonPreferences_Entry<bool> speakAudioCaptionsEntry;
 
         public static void Initialize()
         {
@@ -24,7 +25,10 @@ namespace AccessibilityMod.Settings
             speechInterruptEntry = category.CreateEntry<bool>("SpeechInterrupt", false,
                 "Enable global speech interrupt");
 
-            MelonLogger.Msg($"[PREFERENCES] Initialized - Dialog: {GetDialogMode()}, Orbs: {GetOrbAnnouncements()}, Interrupt: {GetSpeechInterrupt()}");
+            speakAudioCaptionsEntry = category.CreateEntry<bool>("SpeakAudioCaptions", true,
+                "Speak the game's own sound-effect captions (audio accessibility captions)");
+
+            MelonLogger.Msg($"[PREFERENCES] Initialized - Dialog: {GetDialogMode()}, Orbs: {GetOrbAnnouncements()}, Interrupt: {GetSpeechInterrupt()}, AudioCaptions: {GetSpeakAudioCaptions()}");
         }
 
         public static DialogReadingMode GetDialogMode()
@@ -57,6 +61,17 @@ namespace AccessibilityMod.Settings
         public static void SetSpeechInterrupt(bool enabled)
         {
             speechInterruptEntry.Value = enabled;
+            category.SaveToFile();
+        }
+
+        public static bool GetSpeakAudioCaptions()
+        {
+            return speakAudioCaptionsEntry.Value;
+        }
+
+        public static void SetSpeakAudioCaptions(bool enabled)
+        {
+            speakAudioCaptionsEntry.Value = enabled;
             category.SaveToFile();
         }
     }

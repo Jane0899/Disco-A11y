@@ -38,6 +38,7 @@ public static class Strings
         ["DialogModeSpeakerOnly"] = ("Speaker name only", "Nur Sprechername"),
         ["OrbAnnouncements"] = ("Orb announcements on", "Orb-Ansagen aktiv"),
         ["SpeechInterrupt"] = ("Speech interrupt on", "Sprachunterbrechung aktiv"),
+        ["SpeakAudioCaptions"] = ("Speak sound captions", "Geräusch-Untertitel vorlesen"),
         ["Save"] = ("Save", "Speichern"),
         ["StatusAccessible"] = ("Status", "Status"),
         ["LanguageLabel"] = ("Language:", "Sprache:"),

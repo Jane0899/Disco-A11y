@@ -226,7 +226,8 @@ namespace AccessibilityMod.Navigation
                 CurrentIndex = selectedObjectIndex + 1,
                 TotalCount = GetObjectCountForCategory(currentCategory),
                 CategoryName = ObjectCategorizer.GetCategoryDisplayName(currentCategory),
-                SortingMode = currentSortingMode
+                SortingMode = currentSortingMode,
+                IsReachable = ReachabilityChecker.IsReachable(playerPos, selectedObj.transform.position)
             };
         }
     }
@@ -241,6 +242,9 @@ namespace AccessibilityMod.Navigation
         public int TotalCount { get; set; }
         public string CategoryName { get; set; } = "";
         public SortingMode SortingMode { get; set; } = SortingMode.Directional;
+        // null = unknown (endpoint off the NavMesh / no NavMesh) - only a definite
+        // "false" gets announced, an unknown stays silent.
+        public bool? IsReachable { get; set; }
 
         public string FormatAnnouncement()
         {
@@ -250,7 +254,8 @@ namespace AccessibilityMod.Navigation
             }
 
             string sortModeHint = SortingMode == SortingMode.Directional ? " (clockwise)" : " (by distance)";
-            return $"{ObjectName} {Distance:F0} meters {Direction}, {CurrentIndex} of {TotalCount}. " +
+            string reachabilityHint = IsReachable == false ? " Not reachable on foot from here." : "";
+            return $"{ObjectName} {Distance:F0} meters {Direction}, {CurrentIndex} of {TotalCount}.{reachabilityHint} " +
                    "Press period to cycle, comma to navigate.";
         }
     }

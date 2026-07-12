@@ -107,6 +107,10 @@ namespace AccessibilityMod
             LoggerInstance.Msg($"Scene loaded: {sceneName} (Index: {buildIndex})");
             // Re-detect RTL on scene load in case language changed in settings
             Utils.RTLHelper.ClearCache();
+            // The game only generates sound-effect captions while its caption system is on
+            Patches.AudioCaptionPatches.EnsureCaptionsEnabled();
+            // Retries until the game's InControl action set exists, then runs once
+            GameKeybindConflictChecker.RunOnce();
         }
         
         public override void OnUpdate()

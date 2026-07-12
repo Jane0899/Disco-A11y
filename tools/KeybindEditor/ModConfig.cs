@@ -16,6 +16,7 @@ public sealed class ModConfig
     public int DialogReadingMode { get; set; } // 0 = Disabled, 1 = Full, 2 = SpeakerOnly
     public bool OrbAnnouncements { get; set; } = true;
     public bool SpeechInterrupt { get; set; } = false;
+    public bool SpeakAudioCaptions { get; set; } = true;
 
     public static ModConfig LoadOrDefault(string path)
     {
@@ -72,6 +73,9 @@ public sealed class ModConfig
                     case "SpeechInterrupt":
                         config.SpeechInterrupt = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                         break;
+                    case "SpeakAudioCaptions":
+                        config.SpeakAudioCaptions = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                        break;
                 }
             }
         }
@@ -93,6 +97,7 @@ public sealed class ModConfig
         sb.AppendLine($"DialogReadingMode = {DialogReadingMode}");
         sb.AppendLine($"OrbAnnouncements = {(OrbAnnouncements ? "true" : "false")}");
         sb.AppendLine($"SpeechInterrupt = {(SpeechInterrupt ? "true" : "false")}");
+        sb.AppendLine($"SpeakAudioCaptions = {(SpeakAudioCaptions ? "true" : "false")}");
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, sb.ToString());
