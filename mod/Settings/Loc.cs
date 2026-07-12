@@ -46,6 +46,9 @@ namespace AccessibilityMod.Settings
             ["Tip_Conversation"] = (
                 "Tip: a conversation has started but dialog reading is off. Press {0} to have dialogue read aloud, and {1} to continue automatically after each line.",
                 "Tipp: Ein Gespräch hat begonnen, aber das Vorlesen ist aus. Drücke {0}, um Dialoge vorlesen zu lassen, und {1}, um nach jeder Zeile automatisch weiterzuschalten."),
+            ["UpdateAvailable"] = (
+                "A mod update is available: {0}. Run the installer to update.",
+                "Ein Mod-Update ist verfügbar: {0}. Zum Aktualisieren den Installer ausführen."),
             ["AreaEntered"] = (
                 "Entering area: {0}",
                 "Neuer Bereich: {0}"),

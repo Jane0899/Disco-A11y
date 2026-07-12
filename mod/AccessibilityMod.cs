@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using MelonLoader;
 using HarmonyLib;
 using UnityEngine;
@@ -27,6 +28,13 @@ namespace AccessibilityMod
         /// Null until OnInitializeMelon has run.
         /// </summary>
         public static SmartNavigationSystem NavigationSystem { get; private set; }
+
+        /// <summary>Release tag this build was packed as (v0.2.0 / nightly-... / dev), embedded at build time.</summary>
+        public static string ModVersion =>
+            System.Reflection.Assembly.GetExecutingAssembly()
+                .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+                .OfType<System.Reflection.AssemblyMetadataAttribute>()
+                .FirstOrDefault(a => a.Key == "ModVersion")?.Value ?? "dev";
 
         private string lastAnnouncedScene;
         private float lastSceneCheck;
@@ -59,12 +67,13 @@ namespace AccessibilityMod
 
         public override void OnInitializeMelon()
         {
-            LoggerInstance.Msg("Accessibility Mod initializing...");
+            LoggerInstance.Msg($"Accessibility Mod initializing... (build {ModVersion})");
 
             // Initialize preferences
             AccessibilityPreferences.Initialize();
             KeyBindings.Initialize();
             TutorialGuide.Initialize();
+            UpdateNotifier.Initialize(ModVersion);
 
             // Initialize Harmony patches
             try
@@ -96,7 +105,9 @@ namespace AccessibilityMod
                 if (TolkScreenReader.Instance.HasSpeech())
                 {
                     LoggerInstance.Msg("Speech output available");
-                    TolkScreenReader.Instance.Speak("Disco Elysium Accessibility Mod loaded", true);
+                    // Version included so an update is verifiable by ear - "did the
+                    // upgrade actually take?" was undiagnosable before.
+                    TolkScreenReader.Instance.Speak($"Disco Elysium Accessibility Mod {ModVersion} loaded", true);
                 }
                 
                 if (TolkScreenReader.Instance.HasBraille())
@@ -172,6 +183,8 @@ namespace AccessibilityMod
                 TutorialGuide.Update();
 
                 AnnounceAreaIfChanged();
+
+                UpdateNotifier.Update();
 
                 // Update movement monitoring
                 navigationSystem.UpdateMovement();

@@ -61,6 +61,14 @@ public sealed class MainForm : Form
         Load += async (_, _) =>
         {
             Tolk.Initialize();
+
+            // Mandatory-update gate: an outdated installer must not install.
+            if (Program.UpdateBlockReason != null)
+            {
+                installButton.Enabled = false;
+                Log(Program.UpdateBlockReason);
+            }
+
             var found = GamePathFinder.FindGamePath();
             if (found != null)
             {
@@ -115,6 +123,22 @@ public sealed class MainForm : Form
 
         try
         {
+            if (!DotNetRuntime.IsModRuntimePresent())
+            {
+                var answer = MessageBox.Show(this, Strings.Get("DotNetMissingPrompt"), Strings.Get("DialogTitle"),
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (answer == DialogResult.Yes)
+                {
+                    await DotNetRuntime.InstallAsync(Log);
+                }
+                else
+                {
+                    Log(Strings.Get("DotNetSkipped"));
+                }
+            }
+
+            var freshConfig = ModInstaller.IsFreshConfig(gamePath);
+
             Log(Strings.Get("StepCheckMelonLoader"));
             var installMelonLoader = true;
             if (MelonLoaderInstaller.IsInstalled(gamePath))
@@ -132,8 +156,19 @@ public sealed class MainForm : Form
                 Log(Strings.Get("StepMelonLoaderDone"));
             }
 
-            var tag = await ModInstaller.InstallLatestAsync(gamePath, Log, includePrerelease: prereleaseCheck.Checked);
+            var tag = await ModInstaller.InstallLatestAsync(gamePath, Log,
+                includePrerelease: prereleaseCheck.Checked,
+                confirmOverwrite: (installed, next) =>
+                    MessageBox.Show(this, Strings.Get("ModOverwritePrompt", installed, next), Strings.Get("DialogTitle"),
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes);
             Log($"[{tag}] " + Strings.Get("StepDone"));
+
+            if (freshConfig)
+            {
+                var hasNumpad = MessageBox.Show(this, Strings.Get("PresetPromptText"), Strings.Get("PresetPromptTitle"),
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                await ModInstaller.ApplyPresetAsync(gamePath, hasNumpad == DialogResult.Yes ? "numpad" : "stardew", Log);
+            }
 
             var bridgeResult = ModInstaller.SetDevBridgeEnabled(gamePath, devBridgeCheck.Checked);
             LogDevBridgeResult(bridgeResult);

@@ -18,6 +18,43 @@ public static class ModInstaller
     public static bool IsGameRunning() =>
         System.Diagnostics.Process.GetProcessesByName("disco").Length > 0;
 
+    /// <summary>True when no mod config exists yet - i.e. a fresh install that should get a keybind preset written.</summary>
+    public static bool IsFreshConfig(string gamePath) =>
+        !File.Exists(Path.Combine(gamePath, "UserData", "AccessibilityMod.cfg"));
+
+    /// <summary>
+    /// Writes a keybind preset into a fresh install's config via the bundled
+    /// configurator's CLI. Without this, fresh installs get the upstream US-QWERTY
+    /// punctuation defaults - the exact layout problem this fork exists to fix.
+    /// </summary>
+    public static async Task<bool> ApplyPresetAsync(string gamePath, string preset, Action<string> log)
+    {
+        var configurator = KeybindEditorLocator.Find();
+        if (configurator == null)
+        {
+            log(Strings.Get("PresetToolMissing"));
+            return false;
+        }
+
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+            configurator, $"--cli \"{gamePath}\" --preset {preset}")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        });
+        if (process != null)
+        {
+            await process.WaitForExitAsync();
+            if (process.ExitCode == 0)
+            {
+                log(Strings.Get("PresetApplied", preset));
+                return true;
+            }
+        }
+        log(Strings.Get("PresetFailed"));
+        return false;
+    }
+
     public enum DevBridgeResult { Installed, Removed, Absent, SourceMissing }
 
     /// <summary>
@@ -48,10 +85,29 @@ public static class ModInstaller
         return DevBridgeResult.Absent;
     }
 
+    private static string VersionMarkerPath(string gamePath) =>
+        Path.Combine(gamePath, "Mods", "AccessibilityMod.version.txt");
+
+    /// <summary>Version tag of the currently installed mod, or null (no mod / pre-marker install).</summary>
+    public static string? GetInstalledVersion(string gamePath)
+    {
+        try
+        {
+            var marker = VersionMarkerPath(gamePath);
+            if (File.Exists(marker)) return File.ReadAllText(marker).Trim();
+            return File.Exists(Path.Combine(gamePath, "Mods", "AccessibilityMod.dll")) ? "unknown" : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static async Task<string> InstallLatestAsync(
         string gamePath,
         Action<string>? statusCallback = null,
         bool includePrerelease = false,
+        Func<string, string, bool>? confirmOverwrite = null,
         string owner = DefaultOwner,
         string repo = DefaultRepo
     )
@@ -77,15 +133,24 @@ public static class ModInstaller
         JsonElement root;
         if (includePrerelease)
         {
+            // The nightly tag is updated in place, so its created_at stays old and
+            // "first in the list" would wrongly pick a newer-created stable release -
+            // the prerelease channel explicitly means the nightly tag when present.
             root = default;
             var found = false;
             foreach (var candidate in releaseDoc.RootElement.EnumerateArray())
             {
-                if (!candidate.GetProperty("draft").GetBoolean())
+                if (candidate.GetProperty("draft").GetBoolean()) continue;
+                if (candidate.GetProperty("tag_name").GetString() == "nightly")
                 {
                     root = candidate;
                     found = true;
                     break;
+                }
+                if (!found)
+                {
+                    root = candidate;
+                    found = true;
                 }
             }
             if (!found)
@@ -123,6 +188,18 @@ public static class ModInstaller
             throw new Exception($"Release {tag} on {owner}/{repo} has no .zip asset.");
         }
 
+        // "Found vX - overwrite with vY?" so upgrades are explicit and verifiable.
+        var installed = GetInstalledVersion(gamePath);
+        if (installed != null)
+        {
+            statusCallback?.Invoke(Strings.Get("ModVersionFound", installed, tag));
+            if (confirmOverwrite != null && !confirmOverwrite(installed, tag))
+            {
+                statusCallback?.Invoke(Strings.Get("ModOverwriteSkipped"));
+                return installed;
+            }
+        }
+
         statusCallback?.Invoke(Strings.Get("StepDownloadingRelease", tag));
 
         var tempZip = Path.Combine(Path.GetTempPath(), $"DiscoA11y_{Guid.NewGuid():N}.zip");
@@ -143,6 +220,7 @@ public static class ModInstaller
 
             var extractedRoot = FindExtractedRoot(tempDir);
             InstallFiles(extractedRoot, gamePath, statusCallback);
+            File.WriteAllText(VersionMarkerPath(gamePath), tag);
 
             return tag;
         }

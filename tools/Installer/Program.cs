@@ -9,6 +9,11 @@ internal static class Program
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern bool SetDllDirectory(string path);
 
+    // A WinExe has no console of its own - attach to the caller's so --cli output shows up.
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern bool AttachConsole(int processId);
+    private const int ATTACH_PARENT_PROCESS = -1;
+
     /// <summary>
     /// Self-extracts the embedded companion files (configurator, dev bridge, Tolk
     /// natives) into a SetupFiles subfolder next to the exe, so a single
@@ -45,13 +50,39 @@ internal static class Program
         SetDllDirectory(BundleDir);
     }
 
+    /// <summary>Set when the mandatory startup update check failed - installing stays blocked.</summary>
+    public static string UpdateBlockReason { get; private set; }
+
     [STAThread]
     private static void Main(string[] args)
     {
+        var wasUpdated = args.Contains("--updated");
+        if (wasUpdated) SelfUpdater.CleanupAfterUpdate();
+        args = args.Where(a => a != "--updated").ToArray();
+
         ExtractBundledFiles();
 
-        if (args.Length >= 1 && args[0] == "--cli")
+        var isCli = args.Length >= 1 && args[0] == "--cli";
+        if (isCli) AttachConsole(ATTACH_PARENT_PROCESS);
+        void Log(string s) { if (isCli) Console.WriteLine(s); }
+
+        // Mandatory self-update: with very active development an outdated installer
+        // binary could install wrongly, so no update = no installation.
+        if (!args.Contains("--no-selfupdate") && SelfUpdater.LocalBuildId != "dev")
         {
+            var result = SelfUpdater.EnsureLatestAsync(args, Log).GetAwaiter().GetResult();
+            if (result == SelfUpdater.Result.Restarting) return;
+            if (result == SelfUpdater.Result.Blocked)
+            {
+                var reason = Strings.Get("UpdateCheckFailed", "see above");
+                if (isCli) { Environment.ExitCode = 1; return; }
+                UpdateBlockReason = reason;
+            }
+        }
+
+        if (isCli)
+        {
+            if (wasUpdated) Log(Strings.Get("UpdateRestarted"));
             // The game path can be any non-flag argument after --cli, not just args[1] -
             // otherwise a flag placed before the path (e.g. "--cli --force <path>") would
             // silently discard the path in favor of auto-detection.
@@ -60,7 +91,12 @@ internal static class Program
             var prerelease = args.Contains("--prerelease");
             // tri-state: --devbridge installs it, --no-devbridge removes it, neither leaves it alone
             bool? devBridge = args.Contains("--devbridge") ? true : args.Contains("--no-devbridge") ? false : null;
-            RunCli(gamePathArg, force, prerelease, devBridge).GetAwaiter().GetResult();
+            var preset = "numpad";
+            for (var i = 0; i < args.Length; i++)
+            {
+                if (args[i] == "--preset" && i + 1 < args.Length) preset = args[i + 1];
+            }
+            RunCli(gamePathArg, force, prerelease, devBridge, preset).GetAwaiter().GetResult();
             return;
         }
 
@@ -76,7 +112,7 @@ internal static class Program
     /// prereleases (the nightly channel) instead of the latest stable. --devbridge
     /// additionally installs the AI dev bridge companion mod, --no-devbridge removes it.
     /// </summary>
-    private static async Task RunCli(string? gamePathOverride, bool force, bool includePrerelease, bool? devBridge)
+    private static async Task RunCli(string? gamePathOverride, bool force, bool includePrerelease, bool? devBridge, string preset)
     {
         void Log(string s) => Console.WriteLine(s);
 
@@ -91,6 +127,13 @@ internal static class Program
 
         try
         {
+            if (!DotNetRuntime.IsModRuntimePresent())
+            {
+                await DotNetRuntime.InstallAsync(Log);
+            }
+
+            var freshConfig = ModInstaller.IsFreshConfig(gamePath);
+
             if (MelonLoaderInstaller.IsInstalled(gamePath) && !force)
             {
                 Log("MelonLoader is already installed (use --force to reinstall).");
@@ -104,6 +147,11 @@ internal static class Program
 
             var tag = await ModInstaller.InstallLatestAsync(gamePath, Log, includePrerelease);
             Log($"Mod installed (release {tag}).");
+
+            if (freshConfig)
+            {
+                await ModInstaller.ApplyPresetAsync(gamePath, preset, Log);
+            }
 
             if (devBridge.HasValue)
             {

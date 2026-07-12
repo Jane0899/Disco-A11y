@@ -9,12 +9,21 @@
     <AssemblyCopyright>Copyright ©  2024</AssemblyCopyright>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <AssemblyFileVersion>1.0.0.0</AssemblyFileVersion>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- Assembly-info generation is required for the AssemblyMetadata below (ModVersion);
+         no manual [assembly:] attributes exist that could conflict. -->
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <UseWPF>false</UseWPF>
     <ImportWindowsDesktopTargets>false</ImportWindowsDesktopTargets>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Spoken on startup so players can verify which build actually loaded;
+         set per release via -p:ModVersion=v0.2.0 / nightly-20260712... -->
+    <ModVersion Condition="'$(ModVersion)' == ''">dev</ModVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="ModVersion" Value="$(ModVersion)" />
+  </ItemGroup>
 
   <!-- MelonLoader references instead of PackageReference -->
   <ItemGroup Condition="'$(DISCO_ELYSIUM_PATH)' != ''">

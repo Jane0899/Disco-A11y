@@ -40,6 +40,9 @@ public static class Strings
         ["StepMelonLoaderFallback"] = ("Could not determine the latest MelonLoader version ({0}), falling back to {1}.", "Konnte neueste MelonLoader-Version nicht ermitteln ({0}), nutze stattdessen {1}."),
 
         ["StepDownloadingRelease"] = ("Downloading mod release {0}...", "Lade Mod-Release {0} herunter..."),
+        ["ModVersionFound"] = ("Found installed mod {0} - overwriting with {1}.", "Installierten Mod {0} gefunden - überschreibe mit {1}."),
+        ["ModOverwritePrompt"] = ("Found installed mod {0}. Overwrite with {1}?", "Installierter Mod: {0}. Mit {1} überschreiben?"),
+        ["ModOverwriteSkipped"] = ("Mod installation skipped - existing version kept.", "Mod-Installation übersprungen - bestehende Version bleibt."),
         ["StepExtracting"] = ("Extracting...", "Entpacke..."),
         ["StepCopying"] = ("Copying {0}...", "Kopiere {0}..."),
         ["StepDone"] = ("Installation complete. Launch the game to use the mod.", "Installation abgeschlossen. Starte das Spiel, um den Mod zu nutzen."),
@@ -50,6 +53,24 @@ public static class Strings
         ["InstallErrorDialog"] = ("Installation failed: {0}", "Installation fehlgeschlagen: {0}"),
 
         ["GameRunningError"] = ("Disco Elysium is currently running - please close the game first, then install again.", "Disco Elysium läuft gerade - bitte zuerst das Spiel beenden und dann erneut installieren."),
+
+        ["UpdateChecking"] = ("Checking for installer updates...", "Prüfe auf Installer-Updates..."),
+        ["UpdateDownloading"] = ("A newer installer is available ({0}) - updating and restarting...", "Ein neuerer Installer ist verfügbar ({0}) - aktualisiere und starte neu..."),
+        ["UpdateCheckFailed"] = ("Installer update check failed ({0}). Installation is not possible with a possibly outdated installer - please check your internet connection or download the latest setup from the releases page.", "Installer-Update-Prüfung fehlgeschlagen ({0}). Mit einem womöglich veralteten Installer ist keine Installation möglich - bitte Internetverbindung prüfen oder das neueste Setup von der Release-Seite laden."),
+        ["UpdateRestarted"] = ("Installer updated to the latest version.", "Installer wurde auf die neueste Version aktualisiert."),
+
+        ["DotNetMissingPrompt"] = ("The mod needs the .NET 6 runtime, which is not installed. Download and install it now (about 30 MB, official Microsoft installer)?", "Der Mod benötigt die .NET-6-Laufzeitumgebung, die nicht installiert ist. Jetzt herunterladen und installieren (ca. 30 MB, offizieller Microsoft-Installer)?"),
+        ["DotNetDownloading"] = ("Downloading .NET 6 runtime...", "Lade .NET-6-Laufzeitumgebung herunter..."),
+        ["DotNetInstalling"] = ("Installing .NET 6 runtime (a Windows permission prompt may appear)...", "Installiere .NET-6-Laufzeitumgebung (es kann eine Windows-Berechtigungsabfrage erscheinen)..."),
+        ["DotNetInstalled"] = (".NET 6 runtime installed.", ".NET-6-Laufzeitumgebung installiert."),
+        ["DotNetFailed"] = (".NET 6 runtime still not found - the game may not start modded until it is installed.", ".NET-6-Laufzeitumgebung weiterhin nicht gefunden - das Spiel startet mit Mod womöglich nicht, bis sie installiert ist."),
+        ["DotNetSkipped"] = ("Note: .NET 6 runtime is missing - the modded game will not start until it is installed.", "Hinweis: .NET-6-Laufzeitumgebung fehlt - das Spiel startet mit Mod erst, wenn sie installiert ist."),
+
+        ["PresetPromptTitle"] = ("Keyboard layout", "Tastaturlayout"),
+        ["PresetPromptText"] = ("First install detected. The mod's original hotkeys only work on US keyboards, so a layout-independent preset will be applied.\n\nDoes this computer's keyboard have a number pad? (Yes = use numpad keys too, No = function keys only)", "Erstinstallation erkannt. Die Original-Tasten des Mods funktionieren nur auf US-Tastaturen, daher wird ein layoutunabhängiges Preset eingerichtet.\n\nHat die Tastatur dieses Computers einen Ziffernblock? (Ja = Ziffernblock mitnutzen, Nein = nur Funktionstasten)"),
+        ["PresetApplied"] = ("Layout-independent keybind preset applied ({0}).", "Layoutunabhängiges Tasten-Preset eingerichtet ({0})."),
+        ["PresetFailed"] = ("Could not apply the keybind preset - open the Mod Configurator and load a preset manually.", "Tasten-Preset konnte nicht eingerichtet werden - bitte den Mod-Konfigurator öffnen und ein Preset manuell laden."),
+        ["PresetToolMissing"] = ("Mod Configurator not found - open it later and load a preset manually.", "Mod-Konfigurator nicht gefunden - bitte später öffnen und ein Preset manuell laden."),
 
         ["ReinstallPromptTitle"] = ("MelonLoader already installed", "MelonLoader bereits installiert"),
         ["ReinstallPromptText"] = ("MelonLoader is already installed. Reinstall it anyway?", "MelonLoader ist bereits installiert. Trotzdem neu installieren?"),

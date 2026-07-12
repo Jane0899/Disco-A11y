@@ -9,7 +9,20 @@
     <AssemblyName>DiscoElysiumInstaller</AssemblyName>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <RollForward>Major</RollForward>
+    <!-- Set identically for all flavors of one release via -p:InstallerBuildId=... ;
+         the self-updater compares this against installer-version.txt in the release. -->
+    <InstallerBuildId Condition="'$(InstallerBuildId)' == ''">dev</InstallerBuildId>
+    <InstallerFlavor Condition="'$(InstallerFlavor)' == ''">framework</InstallerFlavor>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="BuildId" Value="$(InstallerBuildId)" />
+    <AssemblyMetadata Include="Flavor" Value="$(InstallerFlavor)" />
+  </ItemGroup>
+
+  <Target Name="WriteInstallerVersionFile" AfterTargets="Publish">
+    <WriteLinesToFile File="$(PublishDir)installer-version.txt" Lines="$(InstallerBuildId)" Overwrite="true" />
+  </Target>
 
   <ItemGroup>
     <None Include="TolkNative\Tolk.dll">
