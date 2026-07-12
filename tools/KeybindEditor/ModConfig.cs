@@ -47,40 +47,62 @@ public sealed class ModConfig
                 continue;
             }
 
+            // MelonPreferences sometimes writes a whole category as a TOML inline table
+            // on a single line ("AccessibilityMod = { DialogReadingMode = 0, ... }")
+            // instead of a [Section] block - both forms occur in real files. Splitting
+            // on commas is safe for our values (ints, bools, and binding strings, none
+            // of which can contain a comma).
+            var inlineMatch = Regex.Match(line, @"^([A-Za-z0-9_]+)\s*=\s*\{(.*)\}\s*$");
+            if (inlineMatch.Success)
+            {
+                var inlineSection = inlineMatch.Groups[1].Value;
+                foreach (var pair in inlineMatch.Groups[2].Value.Split(','))
+                {
+                    var pairMatch = Regex.Match(pair.Trim(), @"^([A-Za-z0-9_]+)\s*=\s*(.+)$");
+                    if (pairMatch.Success)
+                    {
+                        ApplyValue(config, inlineSection, pairMatch.Groups[1].Value, pairMatch.Groups[2].Value.Trim());
+                    }
+                }
+                continue;
+            }
+
             var kvMatch = Regex.Match(line, @"^([A-Za-z0-9_]+)\s*=\s*(.+)$");
             if (!kvMatch.Success || currentSection == null)
             {
                 continue;
             }
 
-            var key = kvMatch.Groups[1].Value;
-            var value = kvMatch.Groups[2].Value.Trim();
-
-            if (currentSection == "KeyBindings" && config.KeyBindings.ContainsKey(key))
-            {
-                config.KeyBindings[key] = Unquote(value);
-            }
-            else if (currentSection == "AccessibilityMod")
-            {
-                switch (key)
-                {
-                    case "DialogReadingMode":
-                        if (int.TryParse(value, out var mode)) config.DialogReadingMode = mode;
-                        break;
-                    case "OrbAnnouncements":
-                        config.OrbAnnouncements = value.Equals("true", StringComparison.OrdinalIgnoreCase);
-                        break;
-                    case "SpeechInterrupt":
-                        config.SpeechInterrupt = value.Equals("true", StringComparison.OrdinalIgnoreCase);
-                        break;
-                    case "SpeakAudioCaptions":
-                        config.SpeakAudioCaptions = value.Equals("true", StringComparison.OrdinalIgnoreCase);
-                        break;
-                }
-            }
+            ApplyValue(config, currentSection, kvMatch.Groups[1].Value, kvMatch.Groups[2].Value.Trim());
         }
 
         return config;
+    }
+
+    private static void ApplyValue(ModConfig config, string section, string key, string value)
+    {
+        if (section == "KeyBindings" && config.KeyBindings.ContainsKey(key))
+        {
+            config.KeyBindings[key] = Unquote(value);
+        }
+        else if (section == "AccessibilityMod")
+        {
+            switch (key)
+            {
+                case "DialogReadingMode":
+                    if (int.TryParse(value, out var mode)) config.DialogReadingMode = mode;
+                    break;
+                case "OrbAnnouncements":
+                    config.OrbAnnouncements = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    break;
+                case "SpeechInterrupt":
+                    config.SpeechInterrupt = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    break;
+                case "SpeakAudioCaptions":
+                    config.SpeakAudioCaptions = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    break;
+            }
+        }
     }
 
     public void Save(string path)
