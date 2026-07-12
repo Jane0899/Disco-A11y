@@ -33,16 +33,24 @@ public static class ModInstaller
         var root = releaseDoc.RootElement;
         var tag = root.GetProperty("tag_name").GetString() ?? "unknown";
 
+        // Releases can carry more than one zip (the mod itself plus a tools bundle), so
+        // prefer the asset named like the mod package and only fall back to "any zip".
         string? downloadUrl = null;
+        string? fallbackUrl = null;
         foreach (var asset in root.GetProperty("assets").EnumerateArray())
         {
             var name = asset.GetProperty("name").GetString();
-            if (name != null && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            if (name == null || !name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var url = asset.GetProperty("browser_download_url").GetString();
+            if (name.StartsWith("DiscoElysiumAccessibilityMod", StringComparison.OrdinalIgnoreCase))
             {
-                downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                downloadUrl = url;
                 break;
             }
+            fallbackUrl ??= url;
         }
+        downloadUrl ??= fallbackUrl;
 
         if (downloadUrl == null)
         {
