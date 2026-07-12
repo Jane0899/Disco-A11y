@@ -61,6 +61,7 @@ namespace AccessibilityMod.Navigation
 
                         float distance = Vector3.Distance(playerPos, obj.transform.position);
                         if (distance > maxDistance) continue;
+                        if (ReachabilityChecker.IsReachable(playerPos, obj.transform.position) == false) continue;
 
                         // Add to Everything category regardless of what it is
                         categorizedObjects[ObjectCategory.Everything].Add(obj);
@@ -78,6 +79,12 @@ namespace AccessibilityMod.Navigation
                         // Apply category-specific distance limits
                         float maxDistance = ObjectCategorizer.GetMaxDistanceForCategory(targetCategory);
                         if (distance > maxDistance) continue;
+
+                        // Rough room awareness: skip objects auto-walk provably cannot
+                        // reach from here (other rooms behind walls, other floors).
+                        // Doors stay listed - they count as reachable within interaction
+                        // range. Unknown (null) is kept, never guessed away.
+                        if (ReachabilityChecker.IsReachable(playerPos, obj.transform.position) == false) continue;
 
                         ObjectCategory objCategory = ObjectCategorizer.CategorizeObject(obj, playerPos);
                         categorizedObjects[objCategory].Add(obj);
@@ -197,6 +204,26 @@ namespace AccessibilityMod.Navigation
             currentSortingMode = mode;
         }
 
+        /// <summary>
+        /// ", open"/", closed"/", locked" for doors, empty otherwise. The game's Door
+        /// component (FortressOccident) carries the live state - name heuristics alone
+        /// could never tell a locked door from an open one.
+        /// </summary>
+        private static string DescribeDoorState(MouseOverHighlight obj)
+        {
+            try
+            {
+                var door = obj.GetComponentInParent<Door>();
+                if (door == null) return "";
+                if (door._isLocked) return ", locked";
+                return door._isOpen ? ", open" : ", closed";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
         public NavigationInfo GetCurrentNavigationInfo(Vector3 playerPos)
         {
             var selectedObj = GetCurrentSelectedObject();
@@ -216,6 +243,7 @@ namespace AccessibilityMod.Navigation
 
             float distance = Vector3.Distance(playerPos, selectedObj.transform.position);
             string name = ObjectNameCleaner.GetBetterObjectName(selectedObj);
+            name += DescribeDoorState(selectedObj);
             string direction = DirectionCalculator.GetCardinalDirection(playerPos, selectedObj.transform.position);
 
             return new NavigationInfo

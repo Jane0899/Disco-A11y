@@ -46,6 +46,9 @@ namespace AccessibilityMod.Settings
             ["Tip_Conversation"] = (
                 "Tip: a conversation has started but dialog reading is off. Press {0} to have dialogue read aloud, and {1} to continue automatically after each line.",
                 "Tipp: Ein Gespräch hat begonnen, aber das Vorlesen ist aus. Drücke {0}, um Dialoge vorlesen zu lassen, und {1}, um nach jeder Zeile automatisch weiterzuschalten."),
+            ["AreaEntered"] = (
+                "Entering area: {0}",
+                "Neuer Bereich: {0}"),
             ["Tip_Arrival"] = (
                 "Tip: you have arrived. Press {0} to interact with the object. {1} makes this happen automatically from now on.",
                 "Tipp: Du bist angekommen. Drücke {0}, um mit dem Objekt zu interagieren. {1} erledigt das künftig automatisch."),

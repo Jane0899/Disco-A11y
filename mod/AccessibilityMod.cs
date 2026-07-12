@@ -28,6 +28,35 @@ namespace AccessibilityMod
         /// </summary>
         public static SmartNavigationSystem NavigationSystem { get; private set; }
 
+        private string lastAnnouncedScene;
+        private float lastSceneCheck;
+
+        /// <summary>
+        /// Announces entering a new area. Runs from OnUpdate rather than
+        /// OnSceneWasLoaded: a scene only counts as a real play area once the player
+        /// character exists in it, which silently skips boot/menu/internal scenes in
+        /// any game without naming them.
+        /// </summary>
+        private void AnnounceAreaIfChanged()
+        {
+            if (Time.unscaledTime - lastSceneCheck < 1f) return;
+            lastSceneCheck = Time.unscaledTime;
+
+            var sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (sceneName == lastAnnouncedScene) return;
+            if (Utils.GameObjectUtils.GetPlayerPosition() == Vector3.zero) return;
+
+            bool isFirstArea = lastAnnouncedScene == null;
+            lastAnnouncedScene = sceneName;
+            // The very first area after loading a save is where the player already
+            // knows they are - only transitions get announced.
+            if (!isFirstArea)
+            {
+                TolkScreenReader.Instance.Speak(
+                    Loc.Get("AreaEntered", sceneName.Replace("-", " ")), false, AnnouncementCategory.Queueable);
+            }
+        }
+
         public override void OnInitializeMelon()
         {
             LoggerInstance.Msg("Accessibility Mod initializing...");
@@ -114,6 +143,10 @@ namespace AccessibilityMod
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             LoggerInstance.Msg($"Scene loaded: {sceneName} (Index: {buildIndex})");
+
+            // Area-change announcements happen in OnUpdate once the player character
+            // exists in the new scene - a global signal that holds for any scene,
+            // instead of maintaining a list of this game's boot/menu scene names.
             // Re-detect RTL on scene load in case language changed in settings
             Utils.RTLHelper.ClearCache();
             // The game only generates sound-effect captions while its caption system is on
@@ -137,6 +170,8 @@ namespace AccessibilityMod
 
                 // Contextual one-shot tutorial tips
                 TutorialGuide.Update();
+
+                AnnounceAreaIfChanged();
 
                 // Update movement monitoring
                 navigationSystem.UpdateMovement();

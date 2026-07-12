@@ -68,6 +68,23 @@ namespace AccessibilityMod.Input
                 AnnounceCurrentSelection();
             }
 
+            // While the dialogue UI is up, world navigation must not run - auto-walking
+            // around mid-conversation (while the game waits for Enter) is disorienting.
+            // Dialog-related keys (reading mode, autoread, repeat, announcements) stay
+            // active; a blocked key speaks a hint instead of silently doing nothing.
+            if (DialogStateManager.IsDialogUiActive)
+            {
+                if (IsAnyWorldNavigationKeyPressed()
+                    && UnityEngine.Time.unscaledTime - lastDialogBlockHint > 3f)
+                {
+                    lastDialogBlockHint = UnityEngine.Time.unscaledTime;
+                    TolkScreenReader.Instance.Speak(
+                        "In dialogue. Navigation is paused - press Enter to continue or choose a response.", true);
+                }
+                HandleDialogSafeKeys();
+                return;
+            }
+
             // Toggle sorting mode - toggles between distance and directional sorting
             if (KeyBindings.IsPressed(GameKey.ToggleSortingMode))
             {
@@ -177,6 +194,31 @@ namespace AccessibilityMod.Input
                 navigationSystem.StopMovement();
             }
 
+            HandleDialogSafeKeys();
+
+            // Handle Thought Cabinet specific input
+            ThoughtCabinetNavigationHandler.HandleThoughtCabinetInput();
+        }
+
+        private float lastDialogBlockHint;
+
+        /// <summary>True when a key was pressed whose action is suppressed while the dialogue UI is up.</summary>
+        private bool IsAnyWorldNavigationKeyPressed() =>
+            KeyBindings.IsPressed(GameKey.SelectNpcs) || KeyBindings.IsPressed(GameKey.SelectLocations)
+            || KeyBindings.IsPressed(GameKey.SelectLoot) || KeyBindings.IsPressed(GameKey.SelectEverything)
+            || KeyBindings.IsPressed(GameKey.CycleForward) || KeyBindings.IsPressed(GameKey.CycleBackward)
+            || KeyBindings.IsPressed(GameKey.CycleCategoryForward) || KeyBindings.IsPressed(GameKey.CycleCategoryBackward)
+            || KeyBindings.IsPressed(GameKey.NavigateToSelected) || KeyBindings.IsPressed(GameKey.InteractWithSelected)
+            || KeyBindings.IsPressed(GameKey.CreateWaypoint) || KeyBindings.IsPressed(GameKey.FocusWaypoints)
+            || KeyBindings.IsPressed(GameKey.DeleteWaypoint) || KeyBindings.IsPressed(GameKey.ToggleSortingMode)
+            || KeyBindings.IsPressed(GameKey.ScanSceneByDistance);
+
+        /// <summary>
+        /// Keys that make sense both in the world and while the dialogue UI is up:
+        /// dialog reading/autoread controls and pure announcements.
+        /// </summary>
+        private void HandleDialogSafeKeys()
+        {
             // Toggle dialog reading mode
             if (KeyBindings.IsPressed(GameKey.ToggleDialogReading))
             {
@@ -248,9 +290,6 @@ namespace AccessibilityMod.Input
             {
                 AnnounceKimDialogueStatus();
             }
-
-            // Handle Thought Cabinet specific input
-            ThoughtCabinetNavigationHandler.HandleThoughtCabinetInput();
         }
 
         private void AnnounceCurrentSelection()

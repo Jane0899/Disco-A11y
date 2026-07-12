@@ -76,7 +76,9 @@ namespace AccessibilityMod.UI
                 // Only meaningful when full lines are being read - in speaker-only or
                 // disabled mode auto-advancing would silently skip unread text.
                 if (!DialogStateManager.ShouldReadFullDialog) return;
-                if (!DialogStateManager.IsInConversation()) return;
+                // UI-based check: the isInConversation flag stays false in some flows
+                // (verified in the intro), which silently disabled autoread there.
+                if (!DialogStateManager.IsDialogUiActive) return;
 
                 // Never continue the same line twice; wait for the next one to render.
                 if (DialogSystemPatches.LineCounter == lastContinuedLine) return;

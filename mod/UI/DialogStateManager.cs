@@ -240,6 +240,28 @@ namespace AccessibilityMod.UI
         {
             return isInConversation;
         }
+
+        /// <summary>
+        /// True while the dialogue UI is actually on screen. Unlike the
+        /// isInConversation flag (which some flows never set - verified in the intro),
+        /// the game's own continue button being active is a reliable signal, and it is
+        /// exactly the state in which world navigation must not run.
+        /// </summary>
+        public static bool IsDialogUiActive
+        {
+            get
+            {
+                try
+                {
+                    var button = Il2Cpp.SunshineContinueButton.instance;
+                    return button != null && button.gameObject != null && button.gameObject.activeInHierarchy;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
         
         /// <summary>
         /// Force announce current responses (useful for debugging)
