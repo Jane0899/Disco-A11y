@@ -49,16 +49,40 @@ namespace AccessibilityMod.Settings
                     latest = json.Substring(start, json.IndexOf('"', start) - start);
                 }
 
-                if (latest.Length > 0 && latest != currentVersion)
+                if (IsNewer(latest, currentVersion))
                 {
                     announcement = Loc.Get("UpdateAvailable", latest);
                     MelonLogger.Msg($"[UPDATE] Newer build available: {latest} (running {currentVersion})");
+                }
+                else
+                {
+                    MelonLogger.Msg($"[UPDATE] Up to date (running {currentVersion}, published {latest})");
                 }
             }
             catch (Exception ex)
             {
                 MelonLogger.Msg($"[UPDATE] Check skipped: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// True only when the published build is actually newer than the running one.
+        /// Comparing for mere inequality announced an "update" to anyone running a build
+        /// newer than the channel's - which every local dev build is. Nightly versions are
+        /// "nightly-yyyyMMddHHmmss" timestamps, so they order correctly as plain strings;
+        /// for stable tags an unequal tag is treated as newer (releases only move forward).
+        /// </summary>
+        private static bool IsNewer(string latest, string current)
+        {
+            if (string.IsNullOrWhiteSpace(latest) || latest == current) return false;
+
+            const string prefix = "nightly-";
+            if (latest.StartsWith(prefix) && current.StartsWith(prefix))
+            {
+                return string.CompareOrdinal(latest, current) > 0;
+            }
+
+            return true;
         }
 
         /// <summary>Called from OnUpdate; speaks the pending hint once, queued.</summary>

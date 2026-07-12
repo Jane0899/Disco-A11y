@@ -81,6 +81,25 @@ namespace DevBridge
                 MelonLogger.Warning($"[BRIDGE] Could not hook speech output: {ex.Message}");
             }
 
+            // Lets the bridge fire the mod's own hotkeys without the shipped mod carrying
+            // a remote-control hatch: IsPressed answers true once for an injected key.
+            try
+            {
+                var isPressed = AccessTools.Method(typeof(KeyBindings), nameof(KeyBindings.IsPressed));
+                HarmonyInstance.Patch(isPressed, prefix: new HarmonyMethod(typeof(DevBridgeMod), nameof(IsPressedPrefix)));
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[BRIDGE] Could not hook mod hotkeys: {ex.Message}");
+            }
+
+            // No hook into the game's own input here on purpose. Both routes were tried
+            // and both drove the game into its crash reporter: writing InControl's state
+            // (PlayerAction.UpdateWithState/Commit), and hooking the query side
+            // (OneAxisInputControl.get_WasPressed - a virtual method Il2Cpp cannot patch
+            // safely, and one the game reads every frame for every action). The game's own
+            // menus are therefore driven with "key", which posts a real OS keystroke.
+
             StartSocketServer();
 
             File.WriteAllText(Path.Combine(bridgeDir, "status.txt"), $"DevBridge ready {DateTime.Now:O}\n");
@@ -310,7 +329,9 @@ namespace DevBridge
                     return "Commands:\n" +
                            "state | objects [maxCount] | spoken [count] | screenshot [file]\n" +
                            "screen (all visible on-screen text - compare against 'spoken' to find silent UI)\n" +
-                           "key <i|t|j|c|m|f1|escape|...> (real keypress: game's own menu keys)\n" +
+                           "names [n] (name sources per object: unity name vs. conversation)\n" +
+                           "key <i|t|j|c|m|f1|...> (game menus; posts a real keystroke, steals window focus)\n" +
+                           "modkey <GameKey> | modkeys (fire one of the mod's own hotkeys)\n" +
                            "select npcs|locations|loot|all | cycle [back] | category next|prev\n" +
                            "navigate | interact | stop | announce\n" +
                            "dialog | continue\n" +
@@ -463,6 +484,43 @@ namespace DevBridge
                     return $"moved {parts[1]}; selected: {(now == null ? "(none)" : now.name)}";
                 }
 
+                case "names":
+                {
+                    // Name-source audit: the mod currently speaks Unity object names
+                    // ("Whirling Door Kitsuragi"), which are dev-internal, not what the
+                    // game displays. This lists every candidate source side by side so a
+                    // proper fallback chain can be built - including for the many objects
+                    // that have no conversation at all.
+                    int max = parts.Length > 1 && int.TryParse(parts[1], out var mx) ? mx : 15;
+                    var registry = Il2CppFortressOccident.MouseOverHighlight.registry;
+                    if (registry == null) return "no registry";
+                    var ppos = GameObjectUtils.GetPlayerPosition();
+                    var rows = new List<(float Dist, string Line)>();
+                    foreach (var obj in registry)
+                    {
+                        if (obj == null || obj.transform == null) continue;
+                        float d = Vector3.Distance(ppos, obj.transform.position);
+
+                        string actor = "-", conv = "-", hasDlg = "-";
+                        try
+                        {
+                            var entity = obj.GetComponentInParent<Il2CppFortressOccident.BasicEntity>()
+                                         ?? obj.GetComponentInChildren<Il2CppFortressOccident.BasicEntity>();
+                            if (entity != null)
+                            {
+                                if (!string.IsNullOrWhiteSpace(entity.conversantActorName)) actor = entity.conversantActorName;
+                                if (!string.IsNullOrWhiteSpace(entity.conversation)) conv = entity.conversation;
+                                hasDlg = entity.HasDialogue.ToString();
+                            }
+                        }
+                        catch (Exception ex) { actor = "ERR:" + ex.GetType().Name; }
+
+                        rows.Add((d, $"{d,5:F1}m | unity='{obj.gameObject.name}' | actor='{actor}' | conv='{conv}' | hasDialogue={hasDlg}"));
+                    }
+                    return $"{rows.Count} objects, name sources (closest {Math.Min(max, rows.Count)}):\n" +
+                           string.Join("\n", rows.OrderBy(r => r.Dist).Take(max).Select(r => r.Line));
+                }
+
                 case "screen":
                 {
                     // Accessibility audit tool: dump every piece of text actually visible
@@ -486,14 +544,36 @@ namespace DevBridge
 
                 case "key":
                 {
-                    // Presses a real keyboard key at OS level, so the game's own input
-                    // system sees it exactly like a player's keypress (Unity's Input is
-                    // read-only, and the game's menus are driven by its own bindings:
-                    // i=inventory, t=thought cabinet, j=journal, c=character sheet, m=map).
-                    if (parts.Length < 2) return "usage: key <i|t|j|c|m|f1|escape|tab|space|...>";
+                    // Opens the game's own menus (i=inventory, t=thought cabinet,
+                    // j=journal, c=character sheet, m=map, f1=help). This posts a real OS
+                    // keystroke and therefore has to pull the game window to the front,
+                    // which steals focus from whatever the user is doing - so it is for
+                    // unattended sessions only. Hooking the game's input instead is not an
+                    // option (see OnInitializeMelon). The mod's own hotkeys have a clean
+                    // path and use "modkey".
+                    if (parts.Length < 2) return "usage: key <i|t|j|c|m|f1|escape|tab|...> (steals window focus)";
+                    FocusGameWindow();
                     if (!TryPressKey(parts[1], out var error)) return error;
-                    return $"pressed {parts[1]}";
+                    return $"pressed {parts[1]} (game window was focused)";
                 }
+
+                case "modkey":
+                {
+                    // Fires one of the mod's own hotkeys, whatever it happens to be bound
+                    // to. Done from here via a Harmony hook on KeyBindings.IsPressed rather
+                    // than a test hatch inside the mod, so the shipped mod stays clean.
+                    if (parts.Length < 2) return "usage: modkey <GameKey> - see 'modkeys'";
+                    if (!Enum.TryParse<GameKey>(parts[1], ignoreCase: true, out var gameKey))
+                        return $"unknown mod key '{parts[1]}' - see 'modkeys'";
+
+                    lock (injectedKeys) injectedKeys.Add(gameKey);
+                    return $"mod key fired: {gameKey} (bound to {KeyBindings.SpeakableName(gameKey)})";
+                }
+
+                case "modkeys":
+                    return "mod hotkeys:\n" + string.Join("\n",
+                        Enum.GetValues(typeof(GameKey)).Cast<GameKey>()
+                            .Select(k => $"{k} = {KeyBindings.SpeakableName(k)}"));
 
                 case "buttons":
                 {
@@ -611,6 +691,12 @@ namespace DevBridge
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern void keybd_event(byte vk, byte scan, uint flags, System.UIntPtr extra);
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetActiveWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
         private const uint KEYEVENTF_KEYUP = 0x0002;
 
         private static readonly Dictionary<string, byte> VirtualKeys = new(StringComparer.OrdinalIgnoreCase)
@@ -620,7 +706,17 @@ namespace DevBridge
             ["f1"] = 0x70, ["f5"] = 0x74, ["f9"] = 0x78,
         };
 
-        /// <summary>Presses a key at OS level (the game reads real OS input, which Unity's Input API cannot fake).</summary>
+        /// <summary>Brings the game's own window to the front so an emulated key reaches it.</summary>
+        private static void FocusGameWindow()
+        {
+            try
+            {
+                var hwnd = GetActiveWindow(); // this process' window - we run inside the game
+                if (hwnd != IntPtr.Zero) SetForegroundWindow(hwnd);
+            }
+            catch { /* focus is best-effort */ }
+        }
+
         private static bool TryPressKey(string name, out string error)
         {
             error = null;
@@ -642,6 +738,20 @@ namespace DevBridge
             keybd_event(vk, 0, 0, System.UIntPtr.Zero);
             keybd_event(vk, 0, KEYEVENTF_KEYUP, System.UIntPtr.Zero);
             return true;
+        }
+
+        private static readonly HashSet<GameKey> injectedKeys = new();
+
+        /// <summary>Answers "yes, pressed" once for a mod hotkey the bridge injected, then forgets it.
+        /// The parameter must be named exactly as in KeyBindings.IsPressed(GameKey action).</summary>
+        private static bool IsPressedPrefix(GameKey action, ref bool __result)
+        {
+            lock (injectedKeys)
+            {
+                if (!injectedKeys.Remove(action)) return true; // not injected - run the real check
+            }
+            __result = true;
+            return false; // skip the real check for this one frame
         }
 
         private static string LastSpoken()
