@@ -24,6 +24,8 @@ namespace AccessibilityMod.Settings
 
         CycleForward,
         CycleBackward,
+        CycleCategoryForward,
+        CycleCategoryBackward,
         NavigateToSelected,
         InteractWithSelected,
         StopMovement,

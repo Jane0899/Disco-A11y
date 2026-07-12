@@ -97,8 +97,10 @@ Layout-safe presets (recommended for non-US keyboards). Shared keys:
 - **F2/F3/F4** - Select NPCs/locations/loot category (Ctrl+F2 focus waypoints, Alt+F2 create, Alt+F3 delete)
 - **F6/F7/F8** - Announce current selection / toggle sorting mode / distance scan
 - **Space** - Stop automated movement (same key the game itself uses)
-- **Page Down / Page Up** - Cycle category forward/backward
+- **Page Down / Page Up** - Cycle objects forward/backward
+- **Ctrl+Page Down / Ctrl+Page Up** - Next/previous category (stardew-access convention; NPCs, Locations, Loot, Everything with wrap-around)
 - **Ctrl+Home** - Navigate to selected object
+- **F** - Interact with the selected object (keyboard equivalent of clicking it; the game's own E-Interact only works with controller selection)
 - **F11** - Toggle speech interrupt, **Ctrl+B** - toggle diagnostics
 - **G** - Toggle dialog auto-advance ("autoread": UI/DialogAutoAdvance.cs presses the game's own SunshineContinueButton once the screen reader finishes the current line; only active in full-text dialog reading mode, pauses automatically while response options or checks are up; same key in all presets)
 
@@ -107,7 +109,9 @@ Differing keys:
 - Without numpad (`StardewPreset`): **F10** select everything, **F12** toggle dialog reading
 
 ### Keybind Editor Tool (tools/KeybindEditor)
-A standalone WinForms app (not part of the mod DLL) for editing `UserData/AccessibilityMod.cfg` without launching the game: pick a game folder, load a preset or freely rebind any action to any key, edit the dialog reading mode / orb announcements / speech interrupt settings, save. Localized (English/German). Optionally takes the game folder as `argv[0]` (`DiscoElysiumKeybindEditor.exe "<gamePath>"`) to skip the manual Browse step - used by the Start Menu shortcut the Installer creates. Requires the mod to have been built and installed at least once so its `GameKey` list conceptually matches (the tool's `GameKeyCatalog.cs` is a hand-kept mirror of `mod/Settings/KeyBindings.cs`'s `Defaults`/`NumpadSafePreset` - keep both in sync when adding/renaming a `GameKey`). Build: `cd tools/KeybindEditor && dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true`.
+A standalone WinForms app (not part of the mod DLL) for editing `UserData/AccessibilityMod.cfg` without launching the game: pick a game folder, load a preset or freely rebind any action to any key, edit the dialog reading mode / orb announcements / speech interrupt settings, save. Localized (English/German). Optionally takes the game folder as `argv[0]` (`DiscoElysiumKeybindEditor.exe "<gamePath>"`) to skip the manual Browse step - used by the Start Menu shortcut the Installer creates.
+
+Also has a non-interactive CLI mode for config maintenance after mod updates: `DiscoElysiumKeybindEditor.exe --cli [gamePath] [--preset default|numpad|stardew] [--list]`. Without `--preset` it syncs: actions the mod gained since the config was written are added with their default binding, everything else is left untouched (and the added actions are named in the output). With `--preset` all bindings are replaced by that preset (general settings kept). `--list` prints the resulting bindings. Attaches to the caller's console for output. Requires the mod to have been built and installed at least once so its `GameKey` list conceptually matches (the tool's `GameKeyCatalog.cs` is a hand-kept mirror of `mod/Settings/KeyBindings.cs`'s `Defaults`/`NumpadSafePreset` - keep both in sync when adding/renaming a `GameKey`). Build: `cd tools/KeybindEditor && dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true`.
 
 ### Installer Tool (tools/Installer)
 A standalone WinForms app that installs MelonLoader (dynamic latest-release lookup + PE-header architecture detection, pinned `v0.7.3` fallback) and the mod itself (from a GitHub release - defaults to `danijel1124/Disco-A11y` since upstream `game-a11y/Disco-A11y` has never published one) into an auto-detected or manually chosen game folder. Also has a permanent non-interactive CLI mode: `DiscoElysiumInstaller.exe --cli [gamePath] [--force]` (skips reinstalling an already-present MelonLoader unless `--force`). Also localized (English/German), also vendors `TolkNative/` for spoken status. Build: same pattern as KeybindEditor, `cd tools/Installer && dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true`.

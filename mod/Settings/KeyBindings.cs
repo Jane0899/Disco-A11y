@@ -83,6 +83,9 @@ namespace AccessibilityMod.Settings
 
             [GameKey.CycleForward] = new KeyBinding(KeyCode.Period),
             [GameKey.CycleBackward] = new KeyBinding(KeyCode.Period, requireShift: true),
+            // stardew-access: left ctrl + pageDown/pageUp = next/previous category.
+            [GameKey.CycleCategoryForward] = new KeyBinding(KeyCode.PageDown, requireCtrl: true),
+            [GameKey.CycleCategoryBackward] = new KeyBinding(KeyCode.PageUp, requireCtrl: true),
             [GameKey.NavigateToSelected] = new KeyBinding(KeyCode.Comma),
             // F is free in the game (its own E-Interact only works with the
             // controller-selection flow, which keyboard play never populates).
@@ -136,6 +139,9 @@ namespace AccessibilityMod.Settings
             // stardew-access: pageDown/pageUp = next/previous object.
             [GameKey.CycleForward] = new KeyBinding(KeyCode.PageDown),
             [GameKey.CycleBackward] = new KeyBinding(KeyCode.PageUp),
+            // stardew-access: left ctrl + pageDown/pageUp = next/previous category.
+            [GameKey.CycleCategoryForward] = new KeyBinding(KeyCode.PageDown, requireCtrl: true),
+            [GameKey.CycleCategoryBackward] = new KeyBinding(KeyCode.PageUp, requireCtrl: true),
             // stardew-access: left ctrl + home = move to selected object.
             [GameKey.NavigateToSelected] = new KeyBinding(KeyCode.Home, requireCtrl: true),
             [GameKey.InteractWithSelected] = new KeyBinding(KeyCode.F),

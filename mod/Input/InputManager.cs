@@ -126,12 +126,20 @@ namespace AccessibilityMod.Input
                     navigationSystem.SelectCategory(ObjectCategory.Everything);
             }
 
-            // Cycle within current category: forward / backward. CycleBackward is checked
-            // first because it's the more specific binding (requires Shift by default) -
-            // KeyBindings.IsPressed tolerates extra modifiers, so if CycleForward (no
-            // required modifiers) were checked first it would also match while Shift is
-            // held and CycleBackward would never fire.
-            if (KeyBindings.IsPressed(GameKey.CycleBackward))
+            // Cycle categories / objects. All four share base keys in the layout-safe
+            // presets (PageUp/PageDown with and without Ctrl) and KeyBindings.IsPressed
+            // tolerates extra modifiers, so the more specific bindings (more required
+            // modifiers: Ctrl category cycling, Shift backward-cycling) must be checked
+            // before the plain ones in one else-if chain.
+            if (KeyBindings.IsPressed(GameKey.CycleCategoryBackward))
+            {
+                navigationSystem.CycleCategory(backward: true);
+            }
+            else if (KeyBindings.IsPressed(GameKey.CycleCategoryForward))
+            {
+                navigationSystem.CycleCategory(backward: false);
+            }
+            else if (KeyBindings.IsPressed(GameKey.CycleBackward))
             {
                 navigationSystem.CycleWithinCategory(backward: true);
             }

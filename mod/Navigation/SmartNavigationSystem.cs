@@ -370,6 +370,53 @@ namespace AccessibilityMod.Navigation
         }
 
         /// <summary>
+        /// stardew-access-style category cycling (Ctrl+PageDown/PageUp): steps through
+        /// NPCs, Locations, Loot, Everything with wrap-around, announcing the new
+        /// category's first object. In waypoint focus it steps through the waypoint
+        /// filters (NPCs, Locations, all) instead.
+        /// </summary>
+        public void CycleCategory(bool backward)
+        {
+            if (IsWaypointNamingActive)
+            {
+                TolkScreenReader.Instance.Speak("Finish naming your waypoint first. Press Enter to save or Escape to cancel.", true);
+                return;
+            }
+
+            try
+            {
+                if (currentFocus == NavigationFocus.Waypoints)
+                {
+                    string sceneKey = GetActiveSceneKey();
+                    WaypointCategory? filter = waypointManager.GetCategoryFilter(sceneKey);
+                    // Cycle order: all -> NPCs -> Locations -> all (General acts as "all")
+                    WaypointCategory? next = (filter, backward) switch
+                    {
+                        (null, false) => WaypointCategory.NPCs,
+                        (WaypointCategory.NPCs, false) => WaypointCategory.Locations,
+                        (WaypointCategory.Locations, false) => null,
+                        (null, true) => WaypointCategory.Locations,
+                        (WaypointCategory.Locations, true) => WaypointCategory.NPCs,
+                        (WaypointCategory.NPCs, true) => null,
+                        _ => null,
+                    };
+                    SelectWaypointCategory(next);
+                    return;
+                }
+
+                var order = new[] { ObjectCategory.NPCs, ObjectCategory.Locations, ObjectCategory.Loot, ObjectCategory.Everything };
+                int index = Array.IndexOf(order, stateManager.CurrentCategory);
+                if (index < 0) index = 0;
+                int nextIndex = (index + (backward ? -1 : 1) + order.Length) % order.Length;
+                SelectCategory(order[nextIndex]);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"[SMART NAV] Error cycling categories: {ex}");
+            }
+        }
+
+        /// <summary>
         /// Keyboard equivalent of clicking the currently selected object. The game's own
         /// E-Interact only acts on its controller-driven interactable selection, which
         /// keyboard-only play never populates - so this drives the click pipeline

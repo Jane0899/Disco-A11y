@@ -29,8 +29,10 @@ public static class GameKeyCatalog
         new("CreateWaypoint", "Create waypoint", "Wegpunkt erstellen", "LeftBracket|False|True|False", "F2|False|True|False", "F2|False|True|False"),
         new("DeleteWaypoint", "Delete waypoint", "Wegpunkt löschen", "RightBracket|False|True|False", "F3|False|True|False", "F3|False|True|False"),
 
-        new("CycleForward", "Cycle category forward", "In Kategorie weiter", "Period|False|False|False", "PageDown|False|False|False", "PageDown|False|False|False"),
-        new("CycleBackward", "Cycle category backward", "In Kategorie zurück", "Period|False|False|True", "PageUp|False|False|False", "PageUp|False|False|False"),
+        new("CycleForward", "Cycle objects forward", "Objekte weiter", "Period|False|False|False", "PageDown|False|False|False", "PageDown|False|False|False"),
+        new("CycleBackward", "Cycle objects backward", "Objekte zurück", "Period|False|False|True", "PageUp|False|False|False", "PageUp|False|False|False"),
+        new("CycleCategoryForward", "Next category", "Nächste Kategorie", "PageDown|True|False|False", "PageDown|True|False|False", "PageDown|True|False|False"),
+        new("CycleCategoryBackward", "Previous category", "Vorherige Kategorie", "PageUp|True|False|False", "PageUp|True|False|False", "PageUp|True|False|False"),
         new("NavigateToSelected", "Walk to selected object", "Zum ausgewählten Objekt gehen", "Comma|False|False|False", "Home|True|False|False", "Home|True|False|False"),
         new("InteractWithSelected", "Interact with selected object", "Mit ausgewähltem Objekt interagieren", "F|False|False|False", "F|False|False|False", "F|False|False|False"),
         new("StopMovement", "Stop movement", "Bewegung stoppen", "Slash|False|False|False", "Space|False|False|False", "Space|False|False|False"),

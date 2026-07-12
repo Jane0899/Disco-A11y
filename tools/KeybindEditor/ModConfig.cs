@@ -19,6 +19,15 @@ public sealed class ModConfig
     public bool SpeakAudioCaptions { get; set; } = true;
     public bool DialogAutoAdvance { get; set; } = false;
 
+    /// <summary>
+    /// Actions that were not present in the loaded file and therefore fell back to
+    /// their default binding - i.e. actions added by a mod update since the config
+    /// was written. Empty when the file didn't exist at all (fresh config).
+    /// </summary>
+    public List<string> AddedActions { get; } = new();
+
+    private readonly HashSet<string> actionsSeenInFile = new();
+
     public static ModConfig LoadOrDefault(string path)
     {
         var config = new ModConfig();
@@ -77,6 +86,14 @@ public sealed class ModConfig
             ApplyValue(config, currentSection, kvMatch.Groups[1].Value, kvMatch.Groups[2].Value.Trim());
         }
 
+        foreach (var action in GameKeyCatalog.Actions)
+        {
+            if (!config.actionsSeenInFile.Contains(action.Name))
+            {
+                config.AddedActions.Add(action.Name);
+            }
+        }
+
         return config;
     }
 
@@ -85,6 +102,7 @@ public sealed class ModConfig
         if (section == "KeyBindings" && config.KeyBindings.ContainsKey(key))
         {
             config.KeyBindings[key] = Unquote(value);
+            config.actionsSeenInFile.Add(key);
         }
         else if (section == "AccessibilityMod")
         {
