@@ -2,9 +2,36 @@ namespace Installer;
 
 internal static class Program
 {
+    /// <summary>
+    /// Self-extracts the embedded companion files (configurator, dev bridge, Tolk
+    /// natives) next to the exe, so a single downloaded/copied installer file is a
+    /// complete setup. Locked or read-only destinations are skipped silently - an
+    /// already-present file simply stays, and on a read-only medium the installer
+    /// still works, just without spoken status.
+    /// </summary>
+    private static void ExtractBundledFiles()
+    {
+        var assembly = typeof(Program).Assembly;
+        foreach (var resource in assembly.GetManifestResourceNames())
+        {
+            if (!resource.StartsWith("bundle:")) continue;
+            var dest = Path.Combine(AppContext.BaseDirectory, resource.Substring("bundle:".Length));
+            try
+            {
+                using var source = assembly.GetManifestResourceStream(resource)!;
+                using var file = File.Create(dest);
+                source.CopyTo(file);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
     [STAThread]
     private static void Main(string[] args)
     {
+        ExtractBundledFiles();
+
         if (args.Length >= 1 && args[0] == "--cli")
         {
             // The game path can be any non-flag argument after --cli, not just args[1] -
