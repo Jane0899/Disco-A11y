@@ -28,7 +28,8 @@ public static class ModInstaller
     /// </summary>
     public static DevBridgeResult SetDevBridgeEnabled(string gamePath, bool enable)
     {
-        var source = Path.Combine(AppContext.BaseDirectory, "DevBridge.dll");
+        var source = Path.Combine(Program.BundleDir, "DevBridge.dll");
+        if (!File.Exists(source)) source = Path.Combine(AppContext.BaseDirectory, "DevBridge.dll");
         var dest = Path.Combine(gamePath, "Mods", "DevBridge.dll");
 
         if (enable)

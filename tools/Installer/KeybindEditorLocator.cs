@@ -7,6 +7,8 @@ public static class KeybindEditorLocator
     {
         var candidates = new[]
         {
+            // self-extracted bundle subfolder (single-file setup)
+            Path.Combine(Program.BundleDir, "DiscoElysiumModConfigurator.exe"),
             Path.Combine(AppContext.BaseDirectory, "DiscoElysiumModConfigurator.exe"),
             // pre-rename exe name, still found for older bundles
             Path.Combine(AppContext.BaseDirectory, "DiscoElysiumKeybindEditor.exe"),

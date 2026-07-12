@@ -2,20 +2,36 @@ namespace Installer;
 
 internal static class Program
 {
+    /// <summary>Folder the embedded companion files get extracted into (subfolder next to the exe).</summary>
+    public static string BundleDir => Path.Combine(AppContext.BaseDirectory, "SetupFiles");
+
+    // Makes P/Invoke find Tolk.dll inside the extraction subfolder.
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern bool SetDllDirectory(string path);
+
     /// <summary>
     /// Self-extracts the embedded companion files (configurator, dev bridge, Tolk
-    /// natives) next to the exe, so a single downloaded/copied installer file is a
-    /// complete setup. Locked or read-only destinations are skipped silently - an
-    /// already-present file simply stays, and on a read-only medium the installer
-    /// still works, just without spoken status.
+    /// natives) into a SetupFiles subfolder next to the exe, so a single
+    /// downloaded/copied installer file is a complete setup. Locked or read-only
+    /// destinations are skipped silently - an already-present file simply stays, and on
+    /// a read-only medium the installer still works, just without spoken status.
     /// </summary>
     private static void ExtractBundledFiles()
     {
         var assembly = typeof(Program).Assembly;
+        try
+        {
+            Directory.CreateDirectory(BundleDir);
+        }
+        catch
+        {
+            return; // read-only medium - nothing to extract to
+        }
+
         foreach (var resource in assembly.GetManifestResourceNames())
         {
             if (!resource.StartsWith("bundle:")) continue;
-            var dest = Path.Combine(AppContext.BaseDirectory, resource.Substring("bundle:".Length));
+            var dest = Path.Combine(BundleDir, resource.Substring("bundle:".Length));
             try
             {
                 using var source = assembly.GetManifestResourceStream(resource)!;
@@ -25,6 +41,8 @@ internal static class Program
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
+
+        SetDllDirectory(BundleDir);
     }
 
     [STAThread]
