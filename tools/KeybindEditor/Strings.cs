@@ -40,6 +40,7 @@ public static class Strings
         ["OrbAnnouncements"] = ("Orb announcements on", "Orb-Ansagen aktiv"),
         ["SpeechInterrupt"] = ("Speech interrupt on", "Sprachunterbrechung aktiv"),
         ["SpeakAudioCaptions"] = ("Speak sound captions", "Geräusch-Untertitel vorlesen"),
+        ["DialogAutoAdvance"] = ("Auto-advance dialog after reading (autoread)", "Dialog nach dem Vorlesen automatisch weiterschalten (Autoread)"),
         ["Save"] = ("Save", "Speichern"),
         ["StatusAccessible"] = ("Status", "Status"),
         ["LanguageLabel"] = ("Language:", "Sprache:"),

@@ -87,6 +87,9 @@ namespace AccessibilityMod.Settings
             [GameKey.StopMovement] = new KeyBinding(KeyCode.Slash),
 
             [GameKey.ToggleDialogReading] = new KeyBinding(KeyCode.Minus),
+            // G is free in the game's default bindings (checked via the conflict dump);
+            // unique base key required, see IsPressed.
+            [GameKey.ToggleDialogAutoAdvance] = new KeyBinding(KeyCode.G),
             [GameKey.RepeatDialogue] = new KeyBinding(KeyCode.R),
             [GameKey.ToggleOrbAnnouncements] = new KeyBinding(KeyCode.Alpha0),
             [GameKey.ToggleSpeechInterrupt] = new KeyBinding(KeyCode.Alpha8),
@@ -136,6 +139,7 @@ namespace AccessibilityMod.Settings
             [GameKey.StopMovement] = new KeyBinding(KeyCode.Space),
 
             [GameKey.ToggleDialogReading] = new KeyBinding(KeyCode.KeypadDivide),
+            [GameKey.ToggleDialogAutoAdvance] = new KeyBinding(KeyCode.G),
             [GameKey.RepeatDialogue] = new KeyBinding(KeyCode.R),
             [GameKey.ToggleOrbAnnouncements] = new KeyBinding(KeyCode.Alpha0),
             [GameKey.ToggleSpeechInterrupt] = new KeyBinding(KeyCode.F11),

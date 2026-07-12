@@ -34,6 +34,13 @@ namespace AccessibilityMod.Patches
         {
             return string.IsNullOrEmpty(lastDialogueLine) ? "No dialogue to repeat" : lastDialogueLine;
         }
+
+        /// <summary>
+        /// Increments once per dialogue line rendered to the log. DialogAutoAdvance uses
+        /// this to only ever continue once per line - without it, a missing screen reader
+        /// (IsSpeaking always false) would race through the whole conversation.
+        /// </summary>
+        public static int LineCounter { get; private set; }
         
         /// <summary>
         /// Patch LogRenderer.AddToLog to capture localized dialog text as it's rendered to the UI
@@ -62,6 +69,7 @@ namespace AccessibilityMod.Patches
                     // Always store the last dialogue line for manual retrieval via hotkey
                     // This works even when dialogue reading is disabled
                     lastDialogueLine = FormatDialogWithSpeaker(speakerName, dialogText);
+                    LineCounter++;
 
                     // Check if any dialog reading mode is enabled for automatic announcement
                     if (!DialogStateManager.IsDialogReadingEnabled) return;

@@ -17,6 +17,7 @@ public sealed class ModConfig
     public bool OrbAnnouncements { get; set; } = true;
     public bool SpeechInterrupt { get; set; } = false;
     public bool SpeakAudioCaptions { get; set; } = true;
+    public bool DialogAutoAdvance { get; set; } = false;
 
     public static ModConfig LoadOrDefault(string path)
     {
@@ -101,6 +102,9 @@ public sealed class ModConfig
                 case "SpeakAudioCaptions":
                     config.SpeakAudioCaptions = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
+                case "DialogAutoAdvance":
+                    config.DialogAutoAdvance = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    break;
             }
         }
     }
@@ -120,6 +124,7 @@ public sealed class ModConfig
         sb.AppendLine($"OrbAnnouncements = {(OrbAnnouncements ? "true" : "false")}");
         sb.AppendLine($"SpeechInterrupt = {(SpeechInterrupt ? "true" : "false")}");
         sb.AppendLine($"SpeakAudioCaptions = {(SpeakAudioCaptions ? "true" : "false")}");
+        sb.AppendLine($"DialogAutoAdvance = {(DialogAutoAdvance ? "true" : "false")}");
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, sb.ToString());

@@ -35,6 +35,7 @@ public static class GameKeyCatalog
         new("StopMovement", "Stop movement", "Bewegung stoppen", "Slash|False|False|False", "Space|False|False|False", "Space|False|False|False"),
 
         new("ToggleDialogReading", "Toggle dialog reading mode", "Dialog-Lesemodus umschalten", "Minus|False|False|False", "KeypadDivide|False|False|False", "F12|False|False|False"),
+        new("ToggleDialogAutoAdvance", "Toggle dialog auto-advance (autoread)", "Automatisches Weiterschalten im Dialog umschalten (Autoread)", "G|False|False|False", "G|False|False|False", "G|False|False|False"),
         new("RepeatDialogue", "Repeat last dialogue line", "Letzte Dialogzeile wiederholen", "R|False|False|False", "R|False|False|False", "R|False|False|False"),
         new("ToggleOrbAnnouncements", "Toggle orb announcements", "Orb-Ansagen umschalten", "Alpha0|False|False|False", "Alpha0|False|False|False", "Alpha0|False|False|False"),
         new("ToggleSpeechInterrupt", "Toggle speech interrupt", "Sprachunterbrechung umschalten", "Alpha8|False|False|False", "F11|False|False|False", "F11|False|False|False"),

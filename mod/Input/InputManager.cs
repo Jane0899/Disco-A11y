@@ -158,6 +158,12 @@ namespace AccessibilityMod.Input
                 DialogStateManager.ToggleDialogReading();
             }
 
+            // Toggle dialog auto-advance ("autoread")
+            if (KeyBindings.IsPressed(GameKey.ToggleDialogAutoAdvance))
+            {
+                DialogAutoAdvance.Toggle();
+            }
+
             // Repeat last dialogue line
             if (KeyBindings.IsPressed(GameKey.RepeatDialogue))
             {

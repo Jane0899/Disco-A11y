@@ -10,6 +10,7 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Entry<bool> orbAnnouncementsEntry;
         private static MelonPreferences_Entry<bool> speechInterruptEntry;
         private static MelonPreferences_Entry<bool> speakAudioCaptionsEntry;
+        private static MelonPreferences_Entry<bool> dialogAutoAdvanceEntry;
 
         public static void Initialize()
         {
@@ -27,6 +28,9 @@ namespace AccessibilityMod.Settings
 
             speakAudioCaptionsEntry = category.CreateEntry<bool>("SpeakAudioCaptions", true,
                 "Speak the game's own sound-effect captions (audio accessibility captions)");
+
+            dialogAutoAdvanceEntry = category.CreateEntry<bool>("DialogAutoAdvance", false,
+                "Automatically continue dialogue once the screen reader finishes the current line");
 
             MelonLogger.Msg($"[PREFERENCES] Initialized - Dialog: {GetDialogMode()}, Orbs: {GetOrbAnnouncements()}, Interrupt: {GetSpeechInterrupt()}, AudioCaptions: {GetSpeakAudioCaptions()}");
         }
@@ -67,6 +71,17 @@ namespace AccessibilityMod.Settings
         public static bool GetSpeakAudioCaptions()
         {
             return speakAudioCaptionsEntry.Value;
+        }
+
+        public static bool GetDialogAutoAdvance()
+        {
+            return dialogAutoAdvanceEntry.Value;
+        }
+
+        public static void SetDialogAutoAdvance(bool enabled)
+        {
+            dialogAutoAdvanceEntry.Value = enabled;
+            category.SaveToFile();
         }
 
         public static void SetSpeakAudioCaptions(bool enabled)

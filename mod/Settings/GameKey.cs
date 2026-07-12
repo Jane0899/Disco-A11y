@@ -28,6 +28,7 @@ namespace AccessibilityMod.Settings
         StopMovement,
 
         ToggleDialogReading,
+        ToggleDialogAutoAdvance,
         RepeatDialogue,
         ToggleOrbAnnouncements,
         ToggleSpeechInterrupt,

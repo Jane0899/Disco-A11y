@@ -123,6 +123,9 @@ namespace AccessibilityMod
                 // Handle input through the centralized input manager
                 inputManager.HandleInput();
 
+                // Auto-advance dialogue once the current line finished speaking
+                DialogAutoAdvance.Update();
+
                 // Update movement monitoring
                 navigationSystem.UpdateMovement();
 

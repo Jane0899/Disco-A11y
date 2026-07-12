@@ -53,7 +53,7 @@ The mod follows a **modular system architecture** with clear separation of conce
 
 ### Settings (mod/Settings/)
 - **GameKey.cs / KeyBindings.cs**: Every hotkey is a remappable `GameKey`, persisted via MelonPreferences to `UserData/AccessibilityMod.cfg` (`[KeyBindings]` category, one `"UnityKeyCodeName|RequireCtrl|RequireAlt|RequireShift"` string per action). Three built-in presets: the original US-QWERTY punctuation bindings (`Defaults` - punctuation keys like `[`, `]`, `\` move or require AltGr on non-US layouts such as German QWERTZ, which made the mod effectively unusable there), plus two layout-independent presets built around free F-keys after checking the game's own live keyboard bindings (Keypad1-9 pick dialogue options during conversations, Escape opens the pause menu, KeypadMinus zooms - see `GameKeybindConflictChecker`): `NumpadSafePreset` (F-keys + the two collision-free numpad keys Keypad0/KeypadDivide) and `StardewPreset` (identical but zero numpad usage - rule: must work on keyboards without a numpad). Both keep stardew-access's PageUp/PageDown/Ctrl+Home conventions; StopMovement is Space, the game's own stop key.
-- **AccessibilityPreferences.cs**: Dialog reading mode / orb announcements / speech interrupt, same cfg file, `[AccessibilityMod]` category.
+- **AccessibilityPreferences.cs**: Dialog reading mode / orb announcements / speech interrupt / speak sound captions / dialog auto-advance, same cfg file, `[AccessibilityMod]` category.
 
 ### UI Integration (mod/UI/)
 - **UINavigationHandler.cs**: Detects and announces UI element selection
@@ -100,6 +100,7 @@ Layout-safe presets (recommended for non-US keyboards). Shared keys:
 - **Page Down / Page Up** - Cycle category forward/backward
 - **Ctrl+Home** - Navigate to selected object
 - **F11** - Toggle speech interrupt, **Ctrl+B** - toggle diagnostics
+- **G** - Toggle dialog auto-advance ("autoread": UI/DialogAutoAdvance.cs presses the game's own SunshineContinueButton once the screen reader finishes the current line; only active in full-text dialog reading mode, pauses automatically while response options or checks are up; same key in all presets)
 
 Differing keys:
 - With numpad (`NumpadSafePreset`): **Numpad 0** select everything, **Numpad /** toggle dialog reading

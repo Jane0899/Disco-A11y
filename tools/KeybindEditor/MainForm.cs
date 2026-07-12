@@ -24,6 +24,7 @@ public sealed class MainForm : Form
     private readonly CheckBox orbAnnouncementsCheck;
     private readonly CheckBox speechInterruptCheck;
     private readonly CheckBox speakAudioCaptionsCheck;
+    private readonly CheckBox dialogAutoAdvanceCheck;
     private readonly Button saveButton;
     private readonly Label statusLabel;
 
@@ -34,7 +35,7 @@ public sealed class MainForm : Form
     public MainForm(string? initialGamePath = null)
     {
         Width = 720;
-        Height = 640;
+        Height = 700;
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
 
@@ -83,18 +84,19 @@ public sealed class MainForm : Form
         stardewPresetButton = new Button { Left = 463, Top = 470, Width = 232 };
         stardewPresetButton.Click += (_, _) => ApplyPreset(Preset.Stardew);
 
-        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 100 };
+        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 130 };
         dialogModeLabel = new Label { Left = 12, Top = 28, Width = 130 };
         dialogModeCombo = new ComboBox { Left = 150, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
         orbAnnouncementsCheck = new CheckBox { Left = 12, Top = 60, Width = 200 };
         speechInterruptCheck = new CheckBox { Left = 230, Top = 60, Width = 220 };
         speakAudioCaptionsCheck = new CheckBox { Left = 460, Top = 60, Width = 210 };
-        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, speechInterruptCheck, speakAudioCaptionsCheck });
+        dialogAutoAdvanceCheck = new CheckBox { Left = 12, Top = 92, Width = 440 };
+        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck });
 
-        saveButton = new Button { Left = 12, Top = 620, Width = 150 };
+        saveButton = new Button { Left = 12, Top = 650, Width = 150 };
         saveButton.Click += SaveButton_Click;
 
-        statusLabel = new Label { Left = 170, Top = 625, Width = 525, Text = "" };
+        statusLabel = new Label { Left = 170, Top = 655, Width = 525, Text = "" };
 
         Controls.AddRange(new Control[]
         {
@@ -155,6 +157,8 @@ public sealed class MainForm : Form
         speechInterruptCheck.AccessibleName = Strings.Get("SpeechInterrupt");
         speakAudioCaptionsCheck.Text = Strings.Get("SpeakAudioCaptions");
         speakAudioCaptionsCheck.AccessibleName = Strings.Get("SpeakAudioCaptions");
+        dialogAutoAdvanceCheck.Text = Strings.Get("DialogAutoAdvance");
+        dialogAutoAdvanceCheck.AccessibleName = Strings.Get("DialogAutoAdvance");
         saveButton.Text = Strings.Get("Save");
         statusLabel.AccessibleName = Strings.Get("StatusAccessible");
     }
@@ -186,6 +190,7 @@ public sealed class MainForm : Form
         orbAnnouncementsCheck.Checked = config.OrbAnnouncements;
         speechInterruptCheck.Checked = config.SpeechInterrupt;
         speakAudioCaptionsCheck.Checked = config.SpeakAudioCaptions;
+        dialogAutoAdvanceCheck.Checked = config.DialogAutoAdvance;
         SetStatus(File.Exists(ConfigPath) ? Strings.Get("StatusConfigLoaded") : Strings.Get("StatusConfigNotFound"));
     }
 
@@ -331,6 +336,7 @@ public sealed class MainForm : Form
         config.OrbAnnouncements = orbAnnouncementsCheck.Checked;
         config.SpeechInterrupt = speechInterruptCheck.Checked;
         config.SpeakAudioCaptions = speakAudioCaptionsCheck.Checked;
+        config.DialogAutoAdvance = dialogAutoAdvanceCheck.Checked;
 
         try
         {
