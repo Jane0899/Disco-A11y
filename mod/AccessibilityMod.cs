@@ -162,6 +162,9 @@ namespace AccessibilityMod
             Utils.RTLHelper.ClearCache();
             // The game only generates sound-effect captions while its caption system is on
             Patches.AudioCaptionPatches.EnsureCaptionsEnabled();
+            // Instance IDs get recycled across scenes - a stale entry would name an object
+            // after whatever held its ID in the previous scene.
+            Utils.ObjectNameCleaner.ClearPickupNameCache();
             // Retries until the game's InControl action set exists, then runs once
             GameKeybindConflictChecker.RunOnce();
         }
@@ -185,6 +188,7 @@ namespace AccessibilityMod
                 AnnounceAreaIfChanged();
 
                 UpdateNotifier.Update();
+                UI.ScreenAnnouncer.Update();
 
                 // Update movement monitoring
                 navigationSystem.UpdateMovement();

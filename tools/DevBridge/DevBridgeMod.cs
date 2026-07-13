@@ -501,24 +501,91 @@ namespace DevBridge
                         if (obj == null || obj.transform == null) continue;
                         float d = Vector3.Distance(ppos, obj.transform.position);
 
-                        string actor = "-", conv = "-", hasDlg = "-";
+                        // Candidate name sources, side by side: the conversant actor (wrong -
+                        // it is Cuno for Kim's paperwork), and the speaker of the
+                        // conversation's first line, which is what the dialogue actually
+                        // prints ("Spiegel:"). Both shown raw and localized.
+                        string conv = "-", conversant = "-", speaker = "-", speakerLoc = "-";
                         try
                         {
                             var entity = obj.GetComponentInParent<Il2CppFortressOccident.BasicEntity>()
                                          ?? obj.GetComponentInChildren<Il2CppFortressOccident.BasicEntity>();
-                            if (entity != null)
+                            if (entity != null && !string.IsNullOrWhiteSpace(entity.conversation))
                             {
-                                if (!string.IsNullOrWhiteSpace(entity.conversantActorName)) actor = entity.conversantActorName;
-                                if (!string.IsNullOrWhiteSpace(entity.conversation)) conv = entity.conversation;
-                                hasDlg = entity.HasDialogue.ToString();
+                                conv = entity.conversation;
+                                var db = Il2CppPixelCrushers.DialogueSystem.DialogueManager.masterDatabase;
+                                var conversation = db?.GetConversation(conv);
+                                if (conversation != null)
+                                {
+                                    var ca = db.GetActor(conversation.ConversantID);
+                                    if (ca != null) conversant = ca.Name ?? "-";
+
+                                    var first = conversation.GetFirstDialogueEntry();
+                                    if (first != null)
+                                    {
+                                        var sa = db.GetActor(first.ActorID);
+                                        if (sa != null && !string.IsNullOrWhiteSpace(sa.Name))
+                                        {
+                                            speaker = sa.Name;
+                                            var loc = Il2CppPixelCrushers.DialogueSystem.CharacterInfo
+                                                .GetLocalizedDisplayNameInDatabase(sa.Name);
+                                            speakerLoc = string.IsNullOrWhiteSpace(loc) ? "(none)" : loc;
+                                        }
+                                    }
+                                }
                             }
                         }
-                        catch (Exception ex) { actor = "ERR:" + ex.GetType().Name; }
+                        catch (Exception ex) { conv = "ERR:" + ex.GetType().Name; }
 
-                        rows.Add((d, $"{d,5:F1}m | unity='{obj.gameObject.name}' | actor='{actor}' | conv='{conv}' | hasDialogue={hasDlg}"));
+                        // Loot objects are container sources: whatever they hold has a real,
+                        // localized item name in the item database, even when the object
+                        // itself only has a level-designer name.
+                        string contents = "-";
+                        try
+                        {
+                            var source = obj.GetComponentInParent<Il2CppSunshine.ContainerSource>()
+                                         ?? obj.GetComponentInChildren<Il2CppSunshine.ContainerSource>();
+                            var items = source?.containedItems;
+                            if (items != null && items.Count > 0)
+                            {
+                                var names = new List<string>();
+                                foreach (var it in items)
+                                {
+                                    if (it == null || string.IsNullOrWhiteSpace(it.name)) continue;
+                                    var dbItem = Il2Cpp.InventoryItemList.singleton?.GetByName(it.name);
+                                    names.Add(dbItem != null && !string.IsNullOrWhiteSpace(dbItem.displayName)
+                                        ? dbItem.displayName
+                                        : it.name);
+                                }
+                                if (names.Count > 0) contents = string.Join(" + ", names);
+                            }
+                        }
+                        catch (Exception ex) { contents = "ERR:" + ex.GetType().Name; }
+
+                        rows.Add((d, $"{d,5:F1}m | unity='{obj.gameObject.name}' | items='{contents}' | conversant='{conversant}'"));
                     }
-                    return $"{rows.Count} objects, name sources (closest {Math.Min(max, rows.Count)}):\n" +
+                    string lang;
+                    try { lang = Il2CppPixelCrushers.DialogueSystem.Localization.Language; }
+                    catch (Exception ex) { lang = "ERR:" + ex.Message; }
+
+                    return $"{rows.Count} objects, dialogue language='{lang}', name sources (closest {Math.Min(max, rows.Count)}):\n" +
                            string.Join("\n", rows.OrderBy(r => r.Dist).Take(max).Select(r => r.Line));
+                }
+
+                case "pages":
+                {
+                    // Diagnostic for the screen announcer: which of the game's pages exist,
+                    // and which one counts as "currently open".
+                    var sb = new StringBuilder();
+                    var all = UnityEngine.Object.FindObjectsOfType<Il2CppPages.DiscoPage>();
+                    sb.AppendLine($"FindObjectsOfType<DiscoPage>: {all.Length}");
+                    foreach (var p in all)
+                    {
+                        if (p == null) continue;
+                        var canvas = p.GetComponentInParent<Canvas>();
+                        sb.AppendLine($"  {p.GetType().Name} | active={p.gameObject.activeInHierarchy} | enabled={p.enabled} | canvas={(canvas == null ? "none" : canvas.isActiveAndEnabled.ToString())}");
+                    }
+                    return sb.ToString().TrimEnd();
                 }
 
                 case "screen":
@@ -533,8 +600,11 @@ namespace DevBridge
                     {
                         if (t == null || !t.gameObject.activeInHierarchy) continue;
                         if (string.IsNullOrWhiteSpace(t.text)) continue;
-                        // Fully transparent text is present in the hierarchy but not readable.
                         if (t.color.a < 0.05f) continue;
+                        // The game keeps its panels (inventory, thought cabinet, ...) alive and
+                        // active while hiding them by fading the canvas - without this check the
+                        // dump lists every panel in the game and the audit is worthless.
+                        if (!IsActuallyVisible(t)) continue;
 
                         sb.AppendLine($"[{t.transform.parent?.name ?? "?"}] {t.text.Replace("\n", " / ").Trim()}");
                         if (++shown >= 120) { sb.AppendLine("... (truncated)"); break; }
@@ -752,6 +822,32 @@ namespace DevBridge
             }
             __result = true;
             return false; // skip the real check for this one frame
+        }
+
+        /// <summary>
+        /// True when a text element is really on screen: its own canvas renders, and no
+        /// canvas group above it has faded it out. Cheap enough for a one-off dump.
+        /// </summary>
+        private static bool IsActuallyVisible(Il2CppTMPro.TextMeshProUGUI text)
+        {
+            try
+            {
+                var canvas = text.GetComponentInParent<Canvas>();
+                if (canvas == null || !canvas.isActiveAndEnabled) return false;
+
+                var t = text.transform;
+                while (t != null)
+                {
+                    var group = t.GetComponent<CanvasGroup>();
+                    if (group != null && (group.alpha < 0.05f || !group.gameObject.activeSelf)) return false;
+                    t = t.parent;
+                }
+                return true;
+            }
+            catch
+            {
+                return true; // when in doubt, show it - a false positive beats a missed gap
+            }
         }
 
         private static string LastSpoken()

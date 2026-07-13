@@ -70,6 +70,30 @@ namespace AccessibilityMod.Settings
             ["ContainerClosed"] = (
                 "Container closed.",
                 "Container geschlossen."),
+            ["SkillPointOne"] = (
+                "{0} skill point to spend.",
+                "{0} Fähigkeitspunkt zu vergeben."),
+            ["SkillPointsMany"] = (
+                "{0} skill points to spend.",
+                "{0} Fähigkeitspunkte zu vergeben."),
+            ["ExperienceAndLevel"] = (
+                "Experience {0}, level {1}.",
+                "Erfahrung {0}, Level {1}."),
+            ["Screen_INVENTORY"] = ("Inventory", "Inventar"),
+            ["Screen_CHARACTERSHEET"] = ("Character sheet", "Charakterbogen"),
+            ["Screen_THOUGHTCABINET"] = ("Thought cabinet", "Gedankenkabinett"),
+            ["Screen_JOURNAL"] = ("Journal", "Journal"),
+            ["Screen_OPTIONS"] = ("Options", "Optionen"),
+            ["Screen_MAINMENU"] = ("Main menu", "Hauptmenü"),
+            ["Screen_SAVE"] = ("Save game", "Spiel speichern"),
+            ["Screen_LOAD"] = ("Load game", "Spiel laden"),
+            ["Screen_HELPOVERLAY"] = ("Help", "Hilfe"),
+            ["ItemCountOne"] = (
+                "{0} item.",
+                "{0} Gegenstand."),
+            ["ItemCountMany"] = (
+                "{0} items.",
+                "{0} Gegenstände."),
         };
 
         public static string Get(string key) =>
