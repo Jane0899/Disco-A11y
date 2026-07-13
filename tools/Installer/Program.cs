@@ -69,48 +69,36 @@ internal static class Program
         if (isCli) AttachConsole(ATTACH_PARENT_PROCESS);
         void Log(string s) { if (isCli) Console.WriteLine(s); }
 
-        if (!isCli) ApplicationConfiguration.Initialize();
+        if (!isCli)
+        {
+            ApplicationConfiguration.Initialize();
+            Tolk.Initialize(); // the update dialog speaks; the main form initializes it again harmlessly
+        }
 
-        // Mandatory self-update: with very active development an outdated installer
-        // binary could install wrongly, so no update = no installation. Mandatory, but
-        // never silent - the GUI asks first, because replacing the program someone just
-        // started is not something to do behind their back. In --cli every step is
-        // printed to the console the caller is watching, so it proceeds on its own.
+        // Mandatory self-update: with very active development an outdated installer binary
+        // could install wrongly, so no update = no installation. Mandatory, but never
+        // silent - the GUI announces the new version, asks, shows the download progressing
+        // and lets the user pick the moment of the restart. In --cli it proceeds on its
+        // own: every step is printed to the console the caller is watching, and it has to
+        // stay scriptable.
         if (!args.Contains("--no-selfupdate") && SelfUpdater.LocalBuildId != "dev")
         {
-            bool Confirm(string newVersion) => isCli || MessageBox.Show(
-                Strings.Get("UpdateConfirm", newVersion),
-                Strings.Get("WindowTitle"),
-                MessageBoxButtons.OKCancel,
-                MessageBoxIcon.Information) == DialogResult.OK;
+            var (check, version, error) = SelfUpdater.CheckAsync().GetAwaiter().GetResult();
 
-            var result = SelfUpdater.EnsureLatestAsync(args, Log, Confirm).GetAwaiter().GetResult();
-            if (result == SelfUpdater.Result.Restarting) return;
-
-            if (result == SelfUpdater.Result.Declined)
+            if (check == SelfUpdater.CheckResult.Failed)
             {
-                var declined = Strings.Get("UpdateDeclined");
-                if (isCli) { Log(declined); Environment.ExitCode = 1; return; }
-                MessageBox.Show(declined, Strings.Get("WindowTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // The update itself worked - only the relaunch did not. Saying "update check
-            // failed, no installation possible" here would be a lie that leaves the user
-            // stuck with a working, current installer they think is broken.
-            if (result == SelfUpdater.Result.UpdatedButRestartFailed)
-            {
-                var message = Strings.Get("UpdateDoneRestartYourself");
-                if (isCli) { Log(message); return; }
-                MessageBox.Show(message, Strings.Get("WindowTitle"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            if (result == SelfUpdater.Result.Blocked)
-            {
-                var reason = Strings.Get("UpdateCheckFailed", "see above");
+                var reason = Strings.Get("UpdateCheckFailed", error);
+                Log(reason);
                 if (isCli) { Environment.ExitCode = 1; return; }
                 UpdateBlockReason = reason;
+            }
+            else if (check == SelfUpdater.CheckResult.UpdateAvailable)
+            {
+                if (isCli)
+                {
+                    if (!RunCliUpdate(args, version, Log)) return;
+                }
+                else if (!RunGuiUpdate(args, version)) return;
             }
         }
 
@@ -135,6 +123,72 @@ internal static class Program
         }
 
         Application.Run(new MainForm());
+    }
+
+    /// <summary>
+    /// The update as a dialog: what version, why it is required, a progress bar while it
+    /// downloads, and then the user's choice of when to restart. Returns false when the
+    /// process should end here (declined, failed, or restarting).
+    /// </summary>
+    private static bool RunGuiUpdate(string[] args, string version)
+    {
+        using var form = new UpdateForm(version, args);
+        form.ShowDialog();
+
+        if (form.Result == UpdateForm.Outcome.Declined)
+        {
+            MessageBox.Show(Strings.Get("UpdateDeclined"), Strings.Get("WindowTitle"),
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
+
+        if (form.Result == UpdateForm.Outcome.Failed)
+        {
+            // The old binary is still in place and still outdated, so installing stays
+            // blocked - but the main window opens and says why, rather than vanishing.
+            UpdateBlockReason = Strings.Get("UpdateCheckFailed", form.Error);
+            return true;
+        }
+
+        // Updated. The user asked to restart it themselves, or we do it for them.
+        if (form.UserWillRestart || !SelfUpdater.TryRestart(args))
+        {
+            MessageBox.Show(Strings.Get("UpdateDoneRestartYourself"), Strings.Get("WindowTitle"),
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        return false;
+    }
+
+    /// <summary>The same update, unattended: printed step by step. Returns false when the process should end here.</summary>
+    private static bool RunCliUpdate(string[] args, string version, Action<string> log)
+    {
+        log(Strings.Get("UpdateDownloading", version));
+
+        var lastStep = -1;
+        var progress = new Progress<int>(percent =>
+        {
+            var step = percent / 10 * 10;
+            if (step <= lastStep || step == 0) return;
+            lastStep = step;
+            log(Strings.Get("UpdatePercent", step));
+        });
+
+        var error = SelfUpdater.DownloadAndSwapAsync(progress).GetAwaiter().GetResult();
+        if (error != null)
+        {
+            log(Strings.Get("UpdateCheckFailed", error));
+            Environment.ExitCode = 1;
+            return false;
+        }
+
+        // The update worked - only a failed relaunch is left to report, and reporting that
+        // as "update check failed, installation not possible" would be a lie that leaves
+        // the user with a working, current installer they believe is broken.
+        log(SelfUpdater.TryRestart(args)
+            ? Strings.Get("UpdateDoneRestart")
+            : Strings.Get("UpdateDoneRestartYourself"));
+        return false;
     }
 
     /// <summary>
