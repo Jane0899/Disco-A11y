@@ -335,7 +335,9 @@ namespace DevBridge
                            "select npcs|locations|loot|all | cycle [back] | category next|prev\n" +
                            "navigate | interact | stop | announce\n" +
                            "dialog | continue\n" +
-                           "teleport <x> <y> <z> | quickload | loadnewest | saves | devmode\n" +
+                           "teleport <x> <y> <z> | goto <scene> <marker> | scenes\n" +
+                           "destinations | travel <destinationId> | view [type]\n" +
+                           "save [name] | quickload | loadnewest | saves | devmode\n" +
                            "readingmode off|full|speaker | set autoread|autointeract|captions on|off\n" +
                            "Transports: this file channel, or TCP 127.0.0.1 (port in UserData/DevBridge/port.txt);\n" +
                            "socket: one command per line, response ends with <<END>>, push events start with '! '";
@@ -751,6 +753,92 @@ namespace DevBridge
 
                 case "saves":
                     return NewestSaveName() is string s ? $"newest save: {s}" : "no save games";
+
+                // Saving without the save screen: an automated test can park the game at an
+                // interesting spot once and reload it, instead of replaying the intro every
+                // time. The save screen's slots are not EventSystem-navigable, so 'ui' can't
+                // reach them.
+                case "save":
+                {
+                    var persistence = UnityEngine.Object.FindObjectOfType<Il2Cpp.SunshinePersistence>();
+                    if (persistence == null) return "SunshinePersistence not found";
+                    string name = parts.Length > 1 ? string.Join(" ", parts.Skip(1)) : "devbridge";
+                    persistence.SaveWithScreenshot(name);
+                    return $"saving as '{name}'";
+                }
+
+                case "scenes":
+                {
+                    var sb = new StringBuilder();
+                    int count = UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings;
+                    for (int i = 0; i < count; i++)
+                    {
+                        string path = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
+                        sb.AppendLine(System.IO.Path.GetFileNameWithoutExtension(path));
+                    }
+                    sb.Append($"({count} scenes in build settings)");
+                    return sb.ToString();
+                }
+
+                // The game's own area change, the one its dialogue scripts use - so it runs
+                // the real transition (loading screen, spawn point, camera) instead of
+                // dropping the player into a scene that was never set up around them.
+                case "goto":
+                {
+                    if (parts.Length < 3) return "usage: goto <sceneName> <locationMarker> (see 'destinations')";
+                    Il2CppSunshine.Dialogue.AreaSpecificLuaFunctions.TeleportTo(parts[1], parts[2]);
+                    return $"teleporting to {parts[1]} at {parts[2]}";
+                }
+
+                // Travel destinations are the doors/exits the game itself registers, so this
+                // is the one list that is guaranteed to name places the player can be sent to.
+                case "destinations":
+                {
+                    var sb = new StringBuilder();
+                    int n = 0;
+                    foreach (var dest in UnityEngine.Object.FindObjectsOfType<Il2CppFortressOccident.TravelDestination>())
+                    {
+                        if (dest == null) continue;
+                        sb.AppendLine($"{dest.name}  (area: {dest.areaName})");
+                        n++;
+                    }
+                    sb.Append($"({n} destinations in the loaded scenes)");
+                    return sb.ToString();
+                }
+
+                // Opens any of the game's screens through its own view controller, so an
+                // audit never needs a real key press (which would steal the user's window).
+                case "view":
+                {
+                    var controller = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Views.ViewController>();
+                    if (controller == null) return "ViewController not found";
+
+                    if (parts.Length < 2)
+                    {
+                        var current = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                        string now = current != null ? current.GetViewType().ToString() : "none";
+                        return $"current view: {now}\navailable: " +
+                               string.Join(" ", Enum.GetNames(typeof(Il2CppSunshine.Views.ViewType)));
+                    }
+
+                    if (!Enum.TryParse<Il2CppSunshine.Views.ViewType>(parts[1], true, out var wanted))
+                        return $"unknown view type '{parts[1]}' - see 'view' for the list";
+
+                    var target = controller.GetViewByType(wanted);
+                    if (target == null) return $"the game has no {wanted} view in this scene";
+
+                    controller.SwitchToView(target, false, false,
+                        Il2CppSunshine.Views.VIEW_STACK_OPERATION.STACK_PREVIOUS);
+                    return $"switched to {wanted}";
+                }
+
+                case "travel":
+                {
+                    if (parts.Length < 2) return "usage: travel <destinationId> (see 'destinations')";
+                    string id = string.Join(" ", parts.Skip(1));
+                    bool ok = Il2CppFortressOccident.TravelDestination.ArriveAt(id);
+                    return ok ? $"travelling to {id}" : $"no destination named '{id}'";
+                }
 
                 case "devmode":
                 {
