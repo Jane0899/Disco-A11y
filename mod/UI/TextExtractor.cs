@@ -155,12 +155,16 @@ namespace AccessibilityMod.UI
                 if (string.IsNullOrEmpty(term)) return null;
 
                 string translated = Il2CppI2.Loc.LocalizationManager.GetTranslation(term);
-                if (!string.IsNullOrWhiteSpace(translated) && translated != term) return translated.Trim();
+                if (DiagnosticLogging)
+                    MelonLogger.Msg($"[TEXT-DIAG] Localize@{uiObject.name} term=\"{term}\" translated=\"{translated}\"");
 
-                // These terms are sprite names, not text keys ("button-begin-de"), so the
-                // localization table has nothing to say about them. Strip the decoration
-                // down to the meaning ("begin") and let our own table name it properly.
-                return NameFromSpriteTerm(term);
+                string label = string.IsNullOrWhiteSpace(translated) ? term : translated.Trim();
+
+                // For these buttons the label is a picture, so what the localization table
+                // hands back is the sprite's file name ("button-begin-de") - in either the
+                // term or the translation. Strip that down to the meaning ("begin") and let
+                // our own table name it; anything that reads like real text passes through.
+                return LooksLikeSlug(label) ? NameFromSpriteTerm(label) : label;
             }
             catch (Exception ex)
             {
@@ -168,6 +172,10 @@ namespace AccessibilityMod.UI
                 return null;
             }
         }
+
+        /// <summary>Machine-readable identifier rather than something a person wrote: no spaces, but separators.</summary>
+        private static bool LooksLikeSlug(string text) =>
+            !text.Contains(" ") && (text.Contains("-") || text.Contains("_") || text.Contains("/"));
 
         /// <summary>
         /// A speakable label from a localized sprite name: "Buttons/button-begin-de" becomes
