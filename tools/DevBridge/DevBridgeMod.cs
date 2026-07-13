@@ -919,12 +919,23 @@ namespace DevBridge
 
         private const uint KEYEVENTF_KEYUP = 0x0002;
 
-        private static readonly Dictionary<string, byte> VirtualKeys = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly Dictionary<string, byte> VirtualKeys = BuildVirtualKeys();
+
+        private static Dictionary<string, byte> BuildVirtualKeys()
         {
-            ["escape"] = 0x1B, ["tab"] = 0x09, ["space"] = 0x20, ["return"] = 0x0D, ["enter"] = 0x0D,
-            ["up"] = 0x26, ["down"] = 0x28, ["left"] = 0x25, ["right"] = 0x27,
-            ["f1"] = 0x70, ["f5"] = 0x74, ["f9"] = 0x78,
-        };
+            var keys = new Dictionary<string, byte>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["escape"] = 0x1B, ["tab"] = 0x09, ["space"] = 0x20, ["return"] = 0x0D, ["enter"] = 0x0D,
+                ["up"] = 0x26, ["down"] = 0x28, ["left"] = 0x25, ["right"] = 0x27,
+            };
+
+            // The letters and function keys the game binds its own actions to (M for the
+            // map, I for inventory, ...) - VK codes for these are just their ASCII values.
+            for (char c = 'a'; c <= 'z'; c++) keys[c.ToString()] = (byte)char.ToUpperInvariant(c);
+            for (int i = 1; i <= 12; i++) keys["f" + i] = (byte)(0x70 + i - 1);
+
+            return keys;
+        }
 
         /// <summary>Brings the game's own window to the front so an emulated key reaches it.</summary>
         private static void FocusGameWindow()
