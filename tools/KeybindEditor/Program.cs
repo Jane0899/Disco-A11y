@@ -110,6 +110,21 @@ internal static class Program
             {
                 Console.WriteLine($"{action.Name} = {config.KeyBindings[action.Name]}");
             }
+
+            var gameControls = GameKeybindReference.Load(gamePath);
+            Console.WriteLine();
+            if (gameControls.Count == 0)
+            {
+                Console.WriteLine("The game's own controls are unknown - play once with the mod installed and they will be listed here.");
+            }
+            else
+            {
+                Console.WriteLine("The game's own controls (reference only, set in the game's options):");
+                foreach (var entry in gameControls)
+                {
+                    Console.WriteLine($"  {entry.Action} = {entry.Keys}");
+                }
+            }
         }
 
         return 0;

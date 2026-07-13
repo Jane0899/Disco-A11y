@@ -207,7 +207,32 @@ public sealed class MainForm : Form
             var item = new ListViewItem(RowText(action.Label, config.KeyBindings[action.Name])) { Tag = action.Name };
             bindingsList.Items.Add(item);
         }
+
+        AppendGameControls();
     }
+
+    /// <summary>
+    /// The game's own controls, appended to the same list so they can be arrowed through
+    /// alongside the mod's. They carry no action tag, which is what marks them read-only:
+    /// rebinding or resetting one is refused with an explanation rather than silently
+    /// writing a key the game will never read.
+    /// </summary>
+    private void AppendGameControls()
+    {
+        var gameControls = GameKeybindReference.Load(gamePathBox.Text.Trim());
+
+        bindingsList.Items.Add(new ListViewItem(
+            gameControls.Count > 0 ? Strings.Get("GameControlsHeader") : Strings.Get("GameControlsMissing")));
+
+        foreach (var entry in gameControls)
+        {
+            bindingsList.Items.Add(new ListViewItem(
+                Strings.Get("GameControlRow", entry.Action, entry.Keys)));
+        }
+    }
+
+    /// <summary>Rows without an action tag are the game's own keys - reference, not settings.</summary>
+    private bool IsGameControlRow(int index) => bindingsList.Items[index].Tag == null;
 
     // Screen readers announce a ListView row from its first column only - a second
     // column with just the key never gets read when arrowing through rows. Putting both
@@ -235,7 +260,14 @@ public sealed class MainForm : Form
             return;
         }
 
-        capturingIndex = bindingsList.SelectedIndices[0];
+        var index = bindingsList.SelectedIndices[0];
+        if (IsGameControlRow(index))
+        {
+            SetStatus(Strings.Get("StatusGameControlReadOnly"));
+            return;
+        }
+
+        capturingIndex = index;
         cancelRebindButton.Enabled = true;
         SetStatus(Strings.Get("StatusPressKey"));
     }
@@ -300,6 +332,12 @@ public sealed class MainForm : Form
         }
 
         var index = bindingsList.SelectedIndices[0];
+        if (IsGameControlRow(index))
+        {
+            SetStatus(Strings.Get("StatusGameControlReadOnly"));
+            return;
+        }
+
         var actionName = (string)bindingsList.Items[index].Tag!;
         var action = GameKeyCatalog.Actions.First(a => a.Name == actionName);
         config.KeyBindings[actionName] = action.DefaultBinding;

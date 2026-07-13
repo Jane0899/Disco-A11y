@@ -63,6 +63,19 @@ public static class Strings
         ["StatusSaveError"] = ("Error while saving: {0}", "Fehler beim Speichern: {0}"),
         ["SaveDialogTitle"] = ("Key Bindings", "Tastenbelegung"),
 
+        // The game's own controls: shown for looking up, never editable from here.
+        ["GameControlsHeader"] = (
+            "--- The game's own controls (reference only, change them in the game's options) ---",
+            "--- Tasten des Spiels selbst (nur zum Nachschlagen, änderbar in den Spieloptionen) ---"),
+        ["GameControlsMissing"] = (
+            "--- The game's own controls will be listed here once you have played once with the mod installed ---",
+            "--- Die Tasten des Spiels erscheinen hier, sobald du einmal mit installiertem Mod gespielt hast ---"),
+        ["GameControlRow"] = ("{0} — {1} (game control)", "{0} — {1} (Spieltaste)"),
+        ["StatusGameControlReadOnly"] = (
+            "This is one of the game's own keys. It can only be changed in the game's own options, not here.",
+            "Das ist eine Taste des Spiels selbst. Sie lässt sich nur in den Spieloptionen ändern, nicht hier."),
+        ["KeyNumpad"] = ("Numpad", "Ziffernblock"),
+
         ["ModCtrl"] = ("Ctrl+", "Strg+"),
         ["ModAlt"] = ("Alt+", "Alt+"),
         ["ModShift"] = ("Shift+", "Umschalt+"),

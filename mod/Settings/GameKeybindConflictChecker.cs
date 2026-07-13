@@ -43,6 +43,7 @@ namespace AccessibilityMod.Settings
 
                 done = true;
                 DumpGameBindings(gameBindings);
+                WriteReferenceFile(gameBindings);
                 AnnounceConflicts(gameBindings);
             }
             catch (Exception ex)
@@ -90,6 +91,52 @@ namespace AccessibilityMod.Settings
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// The file the mod configurator shows as a read-only reference: the game's own
+        /// keys are not remappable from our config, but a player still needs to look them
+        /// up - and a blind player cannot read them off the game's control screen.
+        /// Written from the live bindings, so in-game rebinds show up here too.
+        /// </summary>
+        public static string ReferenceFilePath => System.IO.Path.Combine("UserData", "GameKeybinds.txt");
+
+        private static void WriteReferenceFile(Dictionary<string, List<string>> gameBindings)
+        {
+            try
+            {
+                // Invert to action -> keys: you look up "what key is Journal on", not
+                // "what is on J".
+                var byAction = new SortedDictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kvp in gameBindings)
+                {
+                    foreach (var action in kvp.Value)
+                    {
+                        if (!byAction.TryGetValue(action, out var keys))
+                        {
+                            keys = new List<string>();
+                            byAction[action] = keys;
+                        }
+                        keys.Add(kvp.Key);
+                    }
+                }
+
+                var sb = new StringBuilder();
+                sb.AppendLine("# Disco Elysium's own keyboard controls, read from the running game.");
+                sb.AppendLine("# Reference only - these are set in the game's own options, not here.");
+                sb.AppendLine($"# Written {DateTime.Now:yyyy-MM-dd HH:mm}");
+                foreach (var kvp in byAction)
+                {
+                    sb.AppendLine($"{kvp.Key}\t{string.Join(", ", kvp.Value)}");
+                }
+
+                System.IO.File.WriteAllText(ReferenceFilePath, sb.ToString());
+                MelonLogger.Msg($"[KEYBIND CONFLICTS] Game key reference written to {ReferenceFilePath}");
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[KEYBIND CONFLICTS] Could not write game key reference: {ex.Message}");
+            }
         }
 
         private static void DumpGameBindings(Dictionary<string, List<string>> gameBindings)
