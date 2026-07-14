@@ -337,7 +337,8 @@ namespace DevBridge
                            "dialog | continue\n" +
                            "teleport <x> <y> <z> | goto <scene> <marker> | scenes\n" +
                            "destinations | travel <destinationId> | view [type]\n" +
-                           "save [name] | quickload | loadnewest | saves | devmode\n" +
+                           "save [name] | load <name> | quickload | loadnewest | saves | devmode\n" +
+                           "trace on|off|tail [n]|holders   (why is the loading screen stuck?)\n" +
                            "readingmode off|full|speaker | set autoread|autointeract|captions on|off\n" +
                            "Transports: this file channel, or TCP 127.0.0.1 (port in UserData/DevBridge/port.txt);\n" +
                            "socket: one command per line, response ends with <<END>>, push events start with '! '";
@@ -746,13 +747,47 @@ namespace DevBridge
                     string newest = NewestSaveName();
                     if (newest == null) return "no save games exist - nothing to load (start a new game first)";
 
+                    if (LoadBlockedReason() is string blocked) return blocked;
+
                     if (verb == "quickload") persistence.DoQuickLoad();
                     else persistence.LoadNewest();
                     return $"{verb} triggered (newest save: {newest})";
                 }
 
                 case "saves":
-                    return NewestSaveName() is string s ? $"newest save: {s}" : "no save games";
+                {
+                    var names = SaveGameNames();
+                    if (names.Count == 0) return "no save games";
+
+                    var sb = new StringBuilder();
+                    foreach (var name in names) sb.AppendLine(name);
+                    sb.Append($"({names.Count} saves; newest: {NewestSaveName() ?? "unknown"})");
+                    return sb.ToString();
+                }
+
+                // Loads one particular save by name, so a test never has to move or delete
+                // somebody else's save files to make its own the newest one.
+                case "load":
+                {
+                    if (parts.Length < 2) return "usage: load <part of the save name>   (see 'saves')";
+                    string needle = string.Join(" ", parts.Skip(1));
+
+                    var matches = SaveGameNames()
+                        .Where(n => n.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
+                        .ToList();
+
+                    if (matches.Count == 0) return $"no save matches '{needle}'";
+                    if (matches.Count > 1)
+                        return $"'{needle}' matches {matches.Count} saves - be more specific:\n" + string.Join("\n", matches);
+
+                    var persistence = UnityEngine.Object.FindObjectOfType<Il2Cpp.SunshinePersistence>();
+                    if (persistence == null) return "SunshinePersistence not found";
+
+                    if (LoadBlockedReason() is string blocked) return blocked;
+
+                    persistence.Load(matches[0], false);
+                    return $"loading '{matches[0]}'";
+                }
 
                 // Saving without the save screen: an automated test can park the game at an
                 // interesting spot once and reload it, instead of replaying the intro every
@@ -855,6 +890,32 @@ namespace DevBridge
                     return $"lua: {value}";
                 }
 
+                // Records what the game does, so a hang can be read afterwards instead of
+                // guessed at. 'trace holders' answers the loading-screen question directly:
+                // the screen stays up while anything holds a delay on it.
+                case "trace":
+                {
+                    if (parts.Length < 2)
+                        return $"usage: trace on|off|tail [n]|holders    (currently {(GameTracer.Enabled ? "on" : "off")}, log: {GameTracer.LogPath})";
+
+                    switch (parts[1])
+                    {
+                        case "on":
+                            GameTracer.SetEnabled(true);
+                            return $"trace on -> {GameTracer.LogPath}";
+                        case "off":
+                            GameTracer.SetEnabled(false);
+                            return "trace off";
+                        case "holders":
+                            return GameTracer.DescribeDelayHolders();
+                        case "tail":
+                            int n = parts.Length > 2 && int.TryParse(parts[2], out var parsed) ? parsed : 40;
+                            return GameTracer.Tail(n);
+                        default:
+                            return "usage: trace on|off|tail [n]|holders";
+                    }
+                }
+
                 case "devmode":
                 {
                     var modes = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.DebugModes>();
@@ -912,6 +973,71 @@ namespace DevBridge
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        /// <summary>
+        /// Whether the game can survive being told to load, or null when it can.
+        ///
+        /// Traced from an actual hang: loading while the game is still booting throws a
+        /// NullReferenceException inside SceneTransitionManager's load coroutine -
+        /// HudToggle.FixForDreamScene, reached from LoadDataAfterLoadingArea, on a HUD that
+        /// does not exist yet. An exception inside a Unity coroutine kills the coroutine, so
+        /// the rest of the load simply never runs and the game sits on the loading screen
+        /// forever. A human never hits this because the main menu they click "continue" in
+        /// only appears once the HUD is up; a script can ask sooner. So we check for the
+        /// very object whose absence causes the crash.
+        /// </summary>
+        private static string LoadBlockedReason()
+        {
+            try
+            {
+                // Wait for the main menu, which is the exact moment a person could click
+                // "continue" - during boot the view is SPECIAL and the game is not ready.
+                // (Checking for the HudToggle object is not enough: it exists during boot,
+                // just not finished, and the crash is inside it.)
+                var view = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                var type = view != null ? view.GetViewType() : Il2CppSunshine.Views.ViewType.CLEAR;
+
+                bool inGame = type != Il2CppSunshine.Views.ViewType.SPECIAL
+                              && type != Il2CppSunshine.Views.ViewType.LOBBY;
+                if (!inGame)
+                    return "the game is still starting up - loading now throws inside its load coroutine (HudToggle.FixForDreamScene) and leaves it stuck on the loading screen for good. Wait for the main menu.";
+            }
+            catch
+            {
+                // If we cannot tell, do not stand in the way.
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Every save the game knows about. Read from the save directory rather than the
+        /// game's cache, because the cache is only refreshed at certain moments and a save
+        /// written seconds ago would be missing from it.
+        /// </summary>
+        private static List<string> SaveGameNames()
+        {
+            var names = new List<string>();
+            try
+            {
+                var dir = System.IO.Path.Combine(Application.persistentDataPath, "SaveGames");
+                if (!System.IO.Directory.Exists(dir)) return names;
+
+                foreach (var file in System.IO.Directory.GetFiles(dir, "*.ntwtf.zip"))
+                {
+                    // "Name(date).ntwtf.zip" - the game loads it by the part before ".ntwtf".
+                    var name = System.IO.Path.GetFileName(file);
+                    int cut = name.IndexOf(".ntwtf", StringComparison.OrdinalIgnoreCase);
+                    names.Add(cut > 0 ? name.Substring(0, cut) : name);
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[BRIDGE] Could not list saves: {ex.Message}");
+            }
+
+            return names;
+        }
 
         /// <summary>
         /// The newest save the game itself would load, or null when there is none. Asks the
