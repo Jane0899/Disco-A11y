@@ -203,7 +203,23 @@ namespace AccessibilityMod.Patches
                 MelonLogger.Msg($"[ORB] spoken via {prefix} t={currentTime:F2} source=<{sourceId}> key=<{key}>");
 
             string announcement = speaker != null ? $"{speaker}: {trimmedText}" : $"{prefix}: {trimmedText}";
-            TolkScreenReader.Instance.Speak(announcement, true, AnnouncementCategory.Queueable);
+
+            // Orb text goes to the separate SAPI voice, not the screen reader: on the screen
+            // reader it was drowned out - every keypress and navigation announcement interrupts
+            // the line before it, and an atmospheric bubble never survived to the end. The SAPI
+            // voice plays in parallel with NVDA instead of competing for the one channel. Lines
+            // queue on it (no interrupt) so two speakers close together are both heard. Only if
+            // SAPI is somehow unavailable does it fall back to the screen reader.
+            if (SapiVoice.Speak(announcement))
+            {
+                // Spoken on the SAPI voice, but still recorded as heard so the speech log and
+                // the debugger transcript stay complete.
+                TolkScreenReader.Instance.RecordExternalSpeech(announcement);
+            }
+            else
+            {
+                TolkScreenReader.Instance.Speak(announcement, true, AnnouncementCategory.Queueable);
+            }
         }
         /// <summary>
         /// Patch for FloatFactory.ShowFloat(string, Transform) to vocalize text

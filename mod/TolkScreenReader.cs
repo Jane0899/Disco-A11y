@@ -137,6 +137,21 @@ namespace AccessibilityMod
             }
         }
 
+        /// <summary>
+        /// Records a line the player heard through some OTHER channel - the separate SAPI voice
+        /// that orb text uses - so the transcript, the speech log and the dev bridge still see
+        /// it, without sending the audio through the screen reader a second time. The debugger
+        /// exists to catch exactly the ambient-speech bugs orb text produces; those must not
+        /// vanish from the record just because they play on a different voice.
+        /// </summary>
+        public void RecordExternalSpeech(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            text = StripHtmlTags(text);
+            SpeechLog.Write(text);
+            RaiseSpoken(text);
+        }
+
         // Enable to log Unicode code points of text sent to the screen reader
         public bool DiagnosticLogging = false;
 
