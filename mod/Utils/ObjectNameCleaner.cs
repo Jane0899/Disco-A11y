@@ -82,7 +82,7 @@ namespace AccessibilityMod.Utils
         /// several things stays under its own name - it's a box, not an item, and its
         /// contents get announced when you open it.
         /// </summary>
-        private static string GetPickupItemName(MouseOverHighlight obj)
+        public static string GetPickupItemName(MouseOverHighlight obj)
         {
             try
             {

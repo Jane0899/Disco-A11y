@@ -840,6 +840,21 @@ namespace DevBridge
                     return ok ? $"travelling to {id}" : $"no destination named '{id}'";
                 }
 
+                // The game's whole story state lives in Lua variables (PixelCrushers
+                // Dialogue System), so this reads and writes anything the game knows about
+                // itself: quest flags, unlocks, time of day. The debug lever, in one line.
+                //   lua return Variable["day"]
+                //   lua Variable["some_flag"] = true
+                case "lua":
+                {
+                    if (parts.Length < 2) return "usage: lua <code>   e.g. lua return Variable[\"day\"]";
+                    string code = command.Substring(command.IndexOf("lua", StringComparison.Ordinal) + 4).Trim();
+
+                    var result = Il2CppPixelCrushers.DialogueSystem.Lua.Run(code, true, true);
+                    string value = result.hasReturnValue ? result.asString : "(no return value)";
+                    return $"lua: {value}";
+                }
+
                 case "devmode":
                 {
                     var modes = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.DebugModes>();

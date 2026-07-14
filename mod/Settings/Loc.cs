@@ -102,6 +102,19 @@ namespace AccessibilityMod.Settings
                 "{0} Optionen:"),
             // The game's own dialogue shortcut keys (1-9) exist, but proved unreliable in
             // testing; arrow keys plus Enter always work, so that is what we tell people.
+            // Diagnostics: every name source for the selected object, each one labelled.
+            // The dialogue source is reported precisely so it can be heard to be wrong -
+            // it names the conversation's actor, not the object.
+            ["NameSourcesHeader"] = ("Name sources:", "Namensquellen:"),
+            ["NameSourcesNoSelection"] = (
+                "Nothing selected. Choose an object first.",
+                "Nichts ausgewählt. Wähle zuerst ein Objekt."),
+            ["NameSourceSpoken"] = ("spoken: {0}.", "gesprochen: {0}."),
+            ["NameSourceUnity"] = ("internal: {0}.", "intern: {0}."),
+            ["NameSourceEntity"] = ("entity: {0}.", "Entität: {0}."),
+            ["NameSourceItem"] = ("item database: {0}.", "Item-Datenbank: {0}."),
+            ["NameSourceDialogue"] = ("dialogue database: {0}.", "Dialog-Datenbank: {0}."),
+            ["NameSourceNone"] = ("nothing", "nichts"),
             ["DialogEnded"] = (
                 "Conversation ended.",
                 "Dialog beendet."),

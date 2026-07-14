@@ -50,5 +50,6 @@ public static class GameKeyCatalog
         new("AnnounceOfficerProfile", "Announce officer profile", "Beamtenprofil ansagen", "O|False|False|False", "O|False|False|False", "O|False|False|False"),
         new("ReadSkillDescription", "Read skill description", "Skill-Beschreibung vorlesen", "N|False|False|False", "N|False|False|False", "N|False|False|False"),
         new("AnnounceKimStatus", "Announce Kim dialogue status", "Kim-Dialogstatus ansagen", "K|False|False|False", "K|False|False|False", "K|False|False|False"),
+        new("AnnounceNameSources", "Announce where the selected object's name comes from (diagnostics)", "Namensquellen des ausgewählten Objekts ansagen (Diagnose)", "N|True|False|False", "N|True|False|False", "N|True|False|False"),
     };
 }

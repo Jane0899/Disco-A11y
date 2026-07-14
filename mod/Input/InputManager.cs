@@ -290,6 +290,14 @@ namespace AccessibilityMod.Input
             {
                 AnnounceKimDialogueStatus();
             }
+
+            // Diagnostics: where the selected object's name comes from. Reports only - a
+            // player who cannot see the object has no other way to tell a wrong name from
+            // a merely odd one.
+            if (KeyBindings.IsPressed(GameKey.AnnounceNameSources))
+            {
+                Utils.NameSourceReporter.AnnounceForSelected(navigationSystem);
+            }
         }
 
         private void AnnounceCurrentSelection()

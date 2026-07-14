@@ -107,6 +107,9 @@ namespace AccessibilityMod.Settings
             [GameKey.AnnounceOfficerProfile] = new KeyBinding(KeyCode.O),
             [GameKey.ReadSkillDescription] = new KeyBinding(KeyCode.N),
             [GameKey.AnnounceKimStatus] = new KeyBinding(KeyCode.K),
+            // Ctrl+N: free in the game's own bindings, and next to the plain N that reads
+            // a skill description - both are "tell me more about what is selected".
+            [GameKey.AnnounceNameSources] = new KeyBinding(KeyCode.N, requireCtrl: true),
         };
 
         /// <summary>
@@ -162,6 +165,9 @@ namespace AccessibilityMod.Settings
             [GameKey.AnnounceOfficerProfile] = new KeyBinding(KeyCode.O),
             [GameKey.ReadSkillDescription] = new KeyBinding(KeyCode.N),
             [GameKey.AnnounceKimStatus] = new KeyBinding(KeyCode.K),
+            // Ctrl+N: free in the game's own bindings, and next to the plain N that reads
+            // a skill description - both are "tell me more about what is selected".
+            [GameKey.AnnounceNameSources] = new KeyBinding(KeyCode.N, requireCtrl: true),
         };
 
         /// <summary>

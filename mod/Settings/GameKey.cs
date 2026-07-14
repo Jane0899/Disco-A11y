@@ -43,5 +43,8 @@ namespace AccessibilityMod.Settings
         AnnounceOfficerProfile,
         ReadSkillDescription,
         AnnounceKimStatus,
+
+        /// <summary>Reports every name the selected object has, from every source. Diagnostic only - changes nothing.</summary>
+        AnnounceNameSources,
     }
 }
