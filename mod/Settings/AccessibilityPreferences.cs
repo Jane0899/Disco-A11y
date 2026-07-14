@@ -8,6 +8,7 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Category category;
         private static MelonPreferences_Entry<int> dialogModeEntry;
         private static MelonPreferences_Entry<bool> orbAnnouncementsEntry;
+        private static MelonPreferences_Entry<int> orbVolumeEntry;
         private static MelonPreferences_Entry<bool> speechInterruptEntry;
         private static MelonPreferences_Entry<bool> speakAudioCaptionsEntry;
         private static MelonPreferences_Entry<bool> dialogAutoAdvanceEntry;
@@ -29,6 +30,13 @@ namespace AccessibilityMod.Settings
 
             orbAnnouncementsEntry = category.CreateEntry<bool>("OrbAnnouncements", true,
                 "Enable orb text announcements");
+
+            // Orb text plays on its own SAPI voice (see mod/SapiVoice.cs); this is that
+            // voice's volume, 0-100. The screen reader has its own volume control and is
+            // untouched by this - the point of the separate voice is that the two are
+            // independent, so the ambient orb chatter can sit quietly under the reader.
+            orbVolumeEntry = category.CreateEntry<int>("OrbVolume", 80,
+                "Volume of the separate orb-text voice, 0-100");
 
             speechInterruptEntry = category.CreateEntry<bool>("SpeechInterrupt", false,
                 "Enable global speech interrupt");
@@ -87,6 +95,18 @@ namespace AccessibilityMod.Settings
         public static void SetOrbAnnouncements(bool enabled)
         {
             orbAnnouncementsEntry.Value = enabled;
+            category.SaveToFile();
+        }
+
+        /// <summary>Volume of the separate orb-text voice, clamped to 0-100.</summary>
+        public static int GetOrbVolume()
+        {
+            return System.Math.Max(0, System.Math.Min(100, orbVolumeEntry.Value));
+        }
+
+        public static void SetOrbVolume(int volume)
+        {
+            orbVolumeEntry.Value = System.Math.Max(0, System.Math.Min(100, volume));
             category.SaveToFile();
         }
 

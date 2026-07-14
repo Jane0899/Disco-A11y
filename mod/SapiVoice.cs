@@ -62,6 +62,25 @@ namespace AccessibilityMod
         }
 
         /// <summary>
+        /// Pushes the configured orb volume onto the voice before it speaks, so moving the
+        /// slider in the configurator takes effect on the very next line without a restart.
+        /// SpVoice.Volume is 0-100, same range as our setting.
+        /// </summary>
+        private static void ApplyVolume()
+        {
+            try
+            {
+                int volume = Settings.AccessibilityPreferences.GetOrbVolume();
+                voiceType.InvokeMember("Volume", BindingFlags.SetProperty, null, voice,
+                    new object[] { volume });
+            }
+            catch
+            {
+                // Non-fatal: a voice that ignores volume still speaks.
+            }
+        }
+
+        /// <summary>
         /// Speaks on the separate SAPI voice. Returns false if SAPI is unavailable, so the
         /// caller can fall back to the screen reader rather than dropping the line.
         /// </summary>
@@ -73,6 +92,7 @@ namespace AccessibilityMod
 
             try
             {
+                ApplyVolume();
                 int flags = SVSFlagsAsync | (interrupt ? SVSFPurgeBeforeSpeak : 0);
                 voiceType.InvokeMember("Speak", BindingFlags.InvokeMethod, null, voice,
                     new object[] { text, flags });

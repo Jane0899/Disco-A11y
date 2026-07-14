@@ -15,6 +15,7 @@ public sealed class ModConfig
 
     public int DialogReadingMode { get; set; } // 0 = Disabled, 1 = Full, 2 = SpeakerOnly
     public bool OrbAnnouncements { get; set; } = true;
+    public int OrbVolume { get; set; } = 80;
     public bool SpeechInterrupt { get; set; } = false;
     public bool SpeakAudioCaptions { get; set; } = true;
     public bool DialogAutoAdvance { get; set; } = false;
@@ -152,6 +153,9 @@ public sealed class ModConfig
                 case "OrbAnnouncements":
                     config.OrbAnnouncements = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
+                case "OrbVolume":
+                    if (int.TryParse(value, out var vol)) config.OrbVolume = Math.Max(0, Math.Min(100, vol));
+                    break;
                 case "SpeechInterrupt":
                     config.SpeechInterrupt = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
@@ -199,6 +203,7 @@ public sealed class ModConfig
         sb.AppendLine("[AccessibilityMod]");
         sb.AppendLine($"DialogReadingMode = {DialogReadingMode}");
         sb.AppendLine($"OrbAnnouncements = {(OrbAnnouncements ? "true" : "false")}");
+        sb.AppendLine($"OrbVolume = {OrbVolume}");
         sb.AppendLine($"SpeechInterrupt = {(SpeechInterrupt ? "true" : "false")}");
         sb.AppendLine($"SpeakAudioCaptions = {(SpeakAudioCaptions ? "true" : "false")}");
         sb.AppendLine($"DialogAutoAdvance = {(DialogAutoAdvance ? "true" : "false")}");
