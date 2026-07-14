@@ -184,6 +184,8 @@ All user-facing announcements go through `TolkScreenReader.Instance.Speak()` whi
 - SAPI fallback when no screen reader is detected
 - **Braille display support**: Automatically outputs to both speech and braille displays via `Tolk.Output()`
 
+**Two output channels, on purpose.** The screen reader is one channel, and the mod's own announcements (navigation, keypress echoes, menu moves) constantly interrupt each other on it. **Orb text** - the atmospheric speech bubbles over the radio and the skills (`OrbTextVocalizationPatches`) - was drowned there, so it goes out on a *separate* voice: Windows SAPI via `mod/SapiVoice.cs` (late-bound COM `SAPI.SpVoice`, async, queued), which plays in parallel with NVDA/JAWS instead of competing for the one channel. It falls back to the screen reader if SAPI is unavailable. Orb text is still recorded as heard via `TolkScreenReader.RecordExternalSpeech` (not `Speak`, which would route audio to the screen reader) so `SpeechLog.txt` and the debugger transcript stay complete. Note the tradeoff: orb no longer passes through the AudioAware queue, so it can overlap the game's Final Cut voice-acting - acceptable because orb rarely coincides with voiced lines and the alternative was losing it entirely.
+
 ### Il2Cpp Considerations
 - Use `Il2Cpp*` prefixed types for game objects (e.g., `Il2CppTMPro.TextMeshProUGUI`)
 - Unity interop requires special handling for some operations
