@@ -85,6 +85,36 @@ public static class ModInstaller
         return DevBridgeResult.Absent;
     }
 
+    /// <summary>
+    /// Puts the mod debugger into the game folder, where the mod's Ctrl+Y looks for it.
+    ///
+    /// Not a checkbox: the key is already behind debug mode, so an exe sitting unused in the
+    /// folder costs nothing - whereas a player who switches debug mode on and presses Ctrl+Y
+    /// only to be told the tool is missing has to go and find a zip.
+    /// </summary>
+    public static bool InstallModDebugger(string gamePath)
+    {
+        const string exeName = "DiscoElysiumModDebugger.exe";
+
+        var source = Path.Combine(Program.BundleDir, exeName);
+        if (!File.Exists(source)) source = Path.Combine(AppContext.BaseDirectory, exeName);
+        if (!File.Exists(source)) return false;
+
+        try
+        {
+            File.Copy(source, Path.Combine(gamePath, exeName), overwrite: true);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;   // in use (debugger open) - the copy already there still works
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     private static string VersionMarkerPath(string gamePath) =>
         Path.Combine(gamePath, "Mods", "AccessibilityMod.version.txt");
 

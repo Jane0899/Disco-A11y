@@ -44,6 +44,7 @@
     <EmbeddedResource Include="TolkNative\nvdaControllerClient64.dll" LogicalName="bundle:nvdaControllerClient64.dll" />
     <EmbeddedResource Include="..\KeybindEditor\bin\Release\net8.0-windows\win-x64\publish\DiscoElysiumModConfigurator.exe" LogicalName="bundle:DiscoElysiumModConfigurator.exe" />
     <EmbeddedResource Include="..\DevBridge\bin\Release\net6.0\DevBridge.dll" LogicalName="bundle:DevBridge.dll" />
+    <EmbeddedResource Include="..\ModDebugger\bin\Release\net8.0-windows\win-x64\publish\DiscoElysiumModDebugger.exe" LogicalName="bundle:DiscoElysiumModDebugger.exe" />
   </ItemGroup>
 
 </Project>

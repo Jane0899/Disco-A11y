@@ -27,6 +27,12 @@ public static class Strings
         ["StepDevBridgeInstalled"] = ("AI dev bridge installed (Mods/DevBridge.dll). Command channel: UserData/DevBridge/.", "AI-Dev-Bridge installiert (Mods/DevBridge.dll). Kommandokanal: UserData/DevBridge/."),
         ["StepDevBridgeRemoved"] = ("AI dev bridge removed.", "AI-Dev-Bridge entfernt."),
         ["StepDevBridgeMissing"] = ("DevBridge.dll not found next to this installer - AI dev bridge skipped.", "DevBridge.dll liegt nicht neben diesem Installer - AI-Dev-Bridge übersprungen."),
+        ["StepDebuggerInstalled"] = (
+            "Mod debugger installed. Switch on debug mode in the configurator, then Ctrl+Y opens it from inside the game.",
+            "Mod-Debugger installiert. Schalte im Konfigurator den Debug-Modus ein, dann öffnet Strg+Y ihn aus dem Spiel heraus."),
+        ["StepDebuggerMissing"] = (
+            "Mod debugger not found next to this installer - skipped.",
+            "Mod-Debugger liegt nicht neben diesem Installer - übersprungen."),
         ["LogAccessible"] = ("Installation log", "Installationsprotokoll"),
 
         ["StatusGamePathMissing"] = ("Game folder not found. Please use 'Browse...' to select it.", "Spielordner nicht gefunden. Bitte über 'Durchsuchen...' auswählen."),
