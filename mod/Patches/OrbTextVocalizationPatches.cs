@@ -70,8 +70,58 @@ namespace AccessibilityMod.Patches
         }
 
         /// <summary>
-        /// Helper method to announce orb text with duplicate detection
+        /// How long a source has to stay quiet before it may speak again, and how that grows.
+        ///
+        /// Suppressing repeated TEXT is not enough: the hostel's radio reads a weather report
+        /// for a different city every twelve seconds, forever, so every line is a new line and
+        /// nothing ever repeats. What loops is not the text, it is the SOURCE. So each source
+        /// gets a budget instead: the first lines come through (a weather report is worth
+        /// hearing once), and every further line from that same source doubles the silence
+        /// that must pass before the next one - 15s, 30s, 60s, up to two minutes. A radio
+        /// talks itself into the background; a person who says one thing and stops is never
+        /// throttled at all. After two minutes of quiet the source is forgiven and starts over,
+        /// so an NPC you come back to later is not still being punished.
         /// </summary>
+        private const float SOURCE_FIRST_COOLDOWN = 15f;
+        private const float SOURCE_MAX_COOLDOWN = 120f;
+        private const float SOURCE_FORGIVE_AFTER = 120f;
+
+        private sealed class SourceState
+        {
+            public float LastSpoken;
+            public float Cooldown;
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<string, SourceState> sources = new();
+
+        /// <summary>
+        /// True when this source has to keep quiet. Updates the source's budget when it speaks.
+        /// </summary>
+        private static bool SourceIsTalkingTooMuch(string source, float now)
+        {
+            if (!sources.TryGetValue(source, out var state))
+            {
+                sources[source] = new SourceState { LastSpoken = now, Cooldown = SOURCE_FIRST_COOLDOWN };
+                return false;
+            }
+
+            float silence = now - state.LastSpoken;
+
+            // Quiet for a long time: whatever it was doing, it stopped. Start over.
+            if (silence >= SOURCE_FORGIVE_AFTER)
+            {
+                state.LastSpoken = now;
+                state.Cooldown = SOURCE_FIRST_COOLDOWN;
+                return false;
+            }
+
+            if (silence < state.Cooldown) return true;
+
+            state.LastSpoken = now;
+            state.Cooldown = Mathf.Min(state.Cooldown * 2f, SOURCE_MAX_COOLDOWN);
+            return false;
+        }
+
         /// <summary>
         /// The comparison key for "have I already said this line?". The same line reaches
         /// us through several patch paths and they do not agree on the details: one carries
@@ -118,6 +168,7 @@ namespace AccessibilityMod.Patches
             if (scene != spokenFloatsScene)
             {
                 spokenFloats.Clear();
+                sources.Clear();
                 spokenFloatsScene = scene;
             }
             if (spokenFloats.TryGetValue(key, out float firstSpoken)
@@ -127,6 +178,21 @@ namespace AccessibilityMod.Patches
                     MelonLogger.Msg($"[ORB] suppressed via {prefix} t={currentTime:F2} key=<{key}>");
                 return;
             }
+
+            string speaker = DescribeSpeaker(target);
+
+            // A source that will not stop talking gets ever longer pauses imposed on it.
+            // Keyed by the speaker where we know one, and by the bubble's anchor otherwise -
+            // an unnamed radio is still one radio.
+            string sourceId = speaker
+                ?? (target != null ? $"#{target.GetInstanceID()}" : "ambient");
+            if (SourceIsTalkingTooMuch(sourceId, currentTime))
+            {
+                if (AccessibilityPreferences.GetDebugMode())
+                    MelonLogger.Msg($"[ORB] throttled source <{sourceId}> t={currentTime:F2} key=<{key}>");
+                return;
+            }
+
             spokenFloats[key] = currentTime;
 
             // Update tracking
@@ -134,9 +200,8 @@ namespace AccessibilityMod.Patches
             lastOrbAnnouncementTime = currentTime;
 
             if (AccessibilityPreferences.GetDebugMode())
-                MelonLogger.Msg($"[ORB] spoken via {prefix} t={currentTime:F2} key=<{key}>");
+                MelonLogger.Msg($"[ORB] spoken via {prefix} t={currentTime:F2} source=<{sourceId}> key=<{key}>");
 
-            string speaker = DescribeSpeaker(target);
             string announcement = speaker != null ? $"{speaker}: {trimmedText}" : $"{prefix}: {trimmedText}";
             TolkScreenReader.Instance.Speak(announcement, true, AnnouncementCategory.Queueable);
         }
