@@ -341,6 +341,32 @@ namespace AccessibilityMod.Input
             {
                 AccessibilityMod.SpeakAreaDescription(onDemand: true);
             }
+
+            // "What even is a Glastara?" - the item's own description on demand, so the scan
+            // announcements can stay short for players who do not want it after every item.
+            if (KeyBindings.IsPressed(GameKey.DescribeItem))
+            {
+                DescribeSelectedItem();
+            }
+        }
+
+        private void DescribeSelectedItem()
+        {
+            var selected = navigationSystem.StateManager.GetCurrentSelectedObject();
+            if (selected == null)
+            {
+                TolkScreenReader.Instance.Speak(Loc.Get("ItemNoSelection"), true);
+                return;
+            }
+
+            string name = Utils.ObjectNameCleaner.GetBetterObjectName(selected);
+            string description = Utils.ObjectNameCleaner.GetPickupItemDescription(selected);
+
+            TolkScreenReader.Instance.Speak(
+                string.IsNullOrEmpty(description)
+                    ? Loc.Get("ItemNoDescription", name)
+                    : $"{name}. {description}",
+                true);
         }
 
         private void AnnounceCurrentSelection()

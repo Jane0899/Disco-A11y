@@ -52,5 +52,8 @@ namespace AccessibilityMod.Settings
 
         /// <summary>Repeats the long first-visit introduction of the area (what kind of place this is).</summary>
         DescribeAreaFull,
+
+        /// <summary>Reads the game's own description of the selected object - "what even is a Glastara?".</summary>
+        DescribeItem,
     }
 }

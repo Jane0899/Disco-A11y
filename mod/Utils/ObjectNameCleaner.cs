@@ -115,7 +115,37 @@ namespace AccessibilityMod.Utils
             }
         }
 
-        private static string ResolvePickupItemName(MouseOverHighlight obj)
+        /// <summary>
+        /// The game's own description of the item lying there, or null.
+        ///
+        /// Item names in this game are proper nouns from a world nobody outside it knows:
+        /// "Glastara, 6 meters west" tells a blind player exactly nothing, while a sighted
+        /// one reads the tooltip. This is that tooltip.
+        /// </summary>
+        public static string GetPickupItemDescription(MouseOverHighlight obj)
+        {
+            try
+            {
+                var dbItem = ResolvePickupItem(obj);
+                var description = dbItem?.description;
+                if (string.IsNullOrWhiteSpace(description)) return null;
+
+                return RTLHelper.FixForScreenReader(StripTags(description).Trim());
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Rich-text markup would otherwise be spoken out as literal angle brackets.</summary>
+        private static string StripTags(string text)
+        {
+            return System.Text.RegularExpressions.Regex.Replace(text, "<[^>]+>", "");
+        }
+
+        /// <summary>The single item a pickup holds, looked up in the game's item database.</summary>
+        private static Il2CppSunshine.Metric.InventoryItem ResolvePickupItem(MouseOverHighlight obj)
         {
             var source = obj.GetComponentInParent<Il2CppSunshine.ContainerSource>()
                          ?? obj.GetComponentInChildren<Il2CppSunshine.ContainerSource>();
@@ -125,8 +155,12 @@ namespace AccessibilityMod.Utils
             var item = items[0];
             if (item == null || string.IsNullOrEmpty(item.name)) return null;
 
-            var dbItem = Il2Cpp.InventoryItemList.singleton?.GetByName(item.name);
-            string display = dbItem?.displayName;
+            return Il2Cpp.InventoryItemList.singleton?.GetByName(item.name);
+        }
+
+        private static string ResolvePickupItemName(MouseOverHighlight obj)
+        {
+            string display = ResolvePickupItem(obj)?.displayName;
             if (string.IsNullOrEmpty(display)) return null;
 
             return RTLHelper.FixForScreenReader(display.Trim());

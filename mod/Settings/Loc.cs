@@ -123,6 +123,14 @@ namespace AccessibilityMod.Settings
             ["AreaNoDescription"] = (
                 "This area has no description yet.",
                 "Für diesen Bereich gibt es noch keine Beschreibung."),
+            // Item names in this game are proper nouns from its own world ("Glastara") -
+            // meaningless without the description a sighted player reads in the tooltip.
+            ["ItemNoSelection"] = (
+                "Nothing selected. Choose an object first.",
+                "Nichts ausgewählt. Wähle zuerst ein Objekt."),
+            ["ItemNoDescription"] = (
+                "{0}. The game gives no description for this.",
+                "{0}. Das Spiel gibt dazu keine Beschreibung her."),
             // The journal's map tab: keyboard access to the travel destinations.
             ["MapOpened"] = (
                 "Map. {0} travel destinations. {1} to cycle, {2} to travel.",

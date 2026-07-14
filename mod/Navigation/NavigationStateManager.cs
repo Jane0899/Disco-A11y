@@ -286,6 +286,9 @@ namespace AccessibilityMod.Navigation
             return new NavigationInfo
             {
                 HasSelection = true,
+                ItemDescription = AccessibilityPreferences.GetItemDescriptions()
+                    ? ObjectNameCleaner.GetPickupItemDescription(selectedObj)
+                    : null,
                 ObjectName = name,
                 Distance = distance,
                 Direction = direction,
@@ -312,6 +315,9 @@ namespace AccessibilityMod.Navigation
         // "false" gets announced, an unknown stays silent.
         public bool? IsReachable { get; set; }
 
+        /// <summary>The game's description of the item, when the player asked for it always.</summary>
+        public string ItemDescription { get; set; }
+
         public string FormatAnnouncement()
         {
             if (!HasSelection)
@@ -321,7 +327,8 @@ namespace AccessibilityMod.Navigation
 
             string sortModeHint = SortingMode == SortingMode.Directional ? " (clockwise)" : " (by distance)";
             string reachabilityHint = IsReachable == false ? " Not reachable on foot from here." : "";
-            return $"{ObjectName} {Distance:F0} meters {Direction}, {CurrentIndex} of {TotalCount}.{reachabilityHint} " +
+            string description = string.IsNullOrEmpty(ItemDescription) ? "" : $" {ItemDescription}";
+            return $"{ObjectName} {Distance:F0} meters {Direction}, {CurrentIndex} of {TotalCount}.{reachabilityHint}{description} " +
                    $"Press {KeyBindings.SpeakableName(GameKey.CycleForward)} to cycle, {KeyBindings.SpeakableName(GameKey.NavigateToSelected)} to navigate.";
         }
     }

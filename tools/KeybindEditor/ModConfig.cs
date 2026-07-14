@@ -19,8 +19,30 @@ public sealed class ModConfig
     public bool SpeakAudioCaptions { get; set; } = true;
     public bool DialogAutoAdvance { get; set; } = false;
     public bool AutoInteract { get; set; } = false;
+    public bool ItemDescriptions { get; set; } = false;
     public bool SpeechLog { get; set; } = false;
     public bool DebugMode { get; set; } = false;
+
+    /// <summary>
+    /// Everything in the config this editor does not know about - unknown keys of
+    /// [AccessibilityMod] and whole unknown sections (the mod's [Tutorial] flags, its
+    /// waypoints) - kept verbatim, section by section, and written back on save.
+    ///
+    /// Saving used to write only the two sections the editor knows, silently deleting
+    /// the rest: opening the configurator once replayed every tutorial tip and every
+    /// first-visit area introduction the player had already heard.
+    /// </summary>
+    public Dictionary<string, List<KeyValuePair<string, string>>> PassedThrough { get; } = new();
+
+    private void PassThrough(string section, string key, string value)
+    {
+        if (!PassedThrough.TryGetValue(section, out var entries))
+        {
+            entries = new List<KeyValuePair<string, string>>();
+            PassedThrough[section] = entries;
+        }
+        entries.Add(new KeyValuePair<string, string>(key, value));
+    }
 
     /// <summary>
     /// Actions that were not present in the loaded file and therefore fell back to
@@ -102,12 +124,25 @@ public sealed class ModConfig
 
     private static void ApplyValue(ModConfig config, string section, string key, string value)
     {
-        if (section == "KeyBindings" && config.KeyBindings.ContainsKey(key))
+        if (section == "KeyBindings")
         {
-            config.KeyBindings[key] = Unquote(value);
-            config.actionsSeenInFile.Add(key);
+            if (config.KeyBindings.ContainsKey(key))
+            {
+                config.KeyBindings[key] = Unquote(value);
+                config.actionsSeenInFile.Add(key);
+            }
+            // A binding for an action this editor does not know (older/newer mod) is
+            // dropped on purpose: the [KeyBindings] section is rewritten from the catalog.
+            return;
         }
-        else if (section == "AccessibilityMod")
+
+        if (section != "AccessibilityMod")
+        {
+            // A whole section we do not manage ([Tutorial], waypoints, ...) - keep it.
+            config.PassThrough(section, key, value);
+            return;
+        }
+
         {
             switch (key)
             {
@@ -137,6 +172,16 @@ public sealed class ModConfig
                 case "AutoInteract":
                     config.AutoInteract = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
+
+                case "ItemDescriptions":
+                    config.ItemDescriptions = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    break;
+
+                // Settings this editor does not show (the mod's language, the list of area
+                // introductions already seen) are carried over untouched.
+                default:
+                    config.PassThrough("AccessibilityMod", key, value);
+                    break;
             }
         }
     }
@@ -158,8 +203,28 @@ public sealed class ModConfig
         sb.AppendLine($"SpeakAudioCaptions = {(SpeakAudioCaptions ? "true" : "false")}");
         sb.AppendLine($"DialogAutoAdvance = {(DialogAutoAdvance ? "true" : "false")}");
         sb.AppendLine($"AutoInteract = {(AutoInteract ? "true" : "false")}");
+        sb.AppendLine($"ItemDescriptions = {(ItemDescriptions ? "true" : "false")}");
         sb.AppendLine($"SpeechLog = {(SpeechLog ? "true" : "false")}");
         sb.AppendLine($"DebugMode = {(DebugMode ? "true" : "false")}");
+        if (PassedThrough.TryGetValue("AccessibilityMod", out var extraSettings))
+        {
+            foreach (var entry in extraSettings)
+            {
+                sb.AppendLine($"{entry.Key} = {entry.Value}");
+            }
+        }
+
+        foreach (var section in PassedThrough)
+        {
+            if (section.Key == "AccessibilityMod") continue;
+
+            sb.AppendLine();
+            sb.AppendLine($"[{section.Key}]");
+            foreach (var entry in section.Value)
+            {
+                sb.AppendLine($"{entry.Key} = {entry.Value}");
+            }
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, sb.ToString());

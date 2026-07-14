@@ -26,6 +26,7 @@ public sealed class MainForm : Form
     private readonly CheckBox speakAudioCaptionsCheck;
     private readonly CheckBox dialogAutoAdvanceCheck;
     private readonly CheckBox autoInteractCheck;
+    private readonly CheckBox itemDescriptionsCheck;
     private readonly CheckBox speechLogCheck;
     private readonly GroupBox debugGroup;
     private readonly CheckBox debugModeCheck;
@@ -39,7 +40,7 @@ public sealed class MainForm : Form
     public MainForm(string? initialGamePath = null)
     {
         Width = 720;
-        Height = 800;
+        Height = 860;
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
 
@@ -88,7 +89,7 @@ public sealed class MainForm : Form
         stardewPresetButton = new Button { Left = 463, Top = 470, Width = 232 };
         stardewPresetButton.Click += (_, _) => ApplyPreset(Preset.Stardew);
 
-        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 130 };
+        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 160 };
         dialogModeLabel = new Label { Left = 12, Top = 28, Width = 130 };
         dialogModeCombo = new ComboBox { Left = 150, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
         orbAnnouncementsCheck = new CheckBox { Left = 12, Top = 60, Width = 200 };
@@ -96,19 +97,20 @@ public sealed class MainForm : Form
         speakAudioCaptionsCheck = new CheckBox { Left = 460, Top = 60, Width = 210 };
         dialogAutoAdvanceCheck = new CheckBox { Left = 12, Top = 92, Width = 400 };
         autoInteractCheck = new CheckBox { Left = 420, Top = 92, Width = 250 };
-        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck });
+        itemDescriptionsCheck = new CheckBox { Left = 12, Top = 124, Width = 660 };
+        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck, itemDescriptionsCheck });
 
         // Everything diagnostic lives under one roof, so it is obvious what is a play
         // setting and what is a "I am working on the mod" setting.
-        debugGroup = new GroupBox { Left = 12, Top = 645, Width = 683, Height = 90 };
+        debugGroup = new GroupBox { Left = 12, Top = 675, Width = 683, Height = 90 };
         debugModeCheck = new CheckBox { Left = 12, Top = 24, Width = 660 };
         speechLogCheck = new CheckBox { Left = 12, Top = 54, Width = 660 };
         debugGroup.Controls.AddRange(new Control[] { debugModeCheck, speechLogCheck });
 
-        saveButton = new Button { Left = 12, Top = 745, Width = 150 };
+        saveButton = new Button { Left = 12, Top = 775, Width = 150 };
         saveButton.Click += SaveButton_Click;
 
-        statusLabel = new Label { Left = 170, Top = 750, Width = 525, Text = "" };
+        statusLabel = new Label { Left = 170, Top = 780, Width = 525, Text = "" };
 
         Controls.AddRange(new Control[]
         {
@@ -173,6 +175,8 @@ public sealed class MainForm : Form
         dialogAutoAdvanceCheck.AccessibleName = Strings.Get("DialogAutoAdvance");
         autoInteractCheck.Text = Strings.Get("AutoInteract");
         autoInteractCheck.AccessibleName = Strings.Get("AutoInteract");
+        itemDescriptionsCheck.Text = Strings.Get("ItemDescriptions");
+        itemDescriptionsCheck.AccessibleName = Strings.Get("ItemDescriptions");
         debugGroup.Text = Strings.Get("DebugGroup");
         debugModeCheck.Text = Strings.Get("DebugMode");
         debugModeCheck.AccessibleName = Strings.Get("DebugMode");
@@ -211,6 +215,7 @@ public sealed class MainForm : Form
         speakAudioCaptionsCheck.Checked = config.SpeakAudioCaptions;
         dialogAutoAdvanceCheck.Checked = config.DialogAutoAdvance;
         autoInteractCheck.Checked = config.AutoInteract;
+        itemDescriptionsCheck.Checked = config.ItemDescriptions;
         speechLogCheck.Checked = config.SpeechLog;
         debugModeCheck.Checked = config.DebugMode;
         SetStatus(File.Exists(ConfigPath) ? Strings.Get("StatusConfigLoaded") : Strings.Get("StatusConfigNotFound"));
@@ -398,6 +403,7 @@ public sealed class MainForm : Form
         config.SpeakAudioCaptions = speakAudioCaptionsCheck.Checked;
         config.DialogAutoAdvance = dialogAutoAdvanceCheck.Checked;
         config.AutoInteract = autoInteractCheck.Checked;
+        config.ItemDescriptions = itemDescriptionsCheck.Checked;
         config.SpeechLog = speechLogCheck.Checked;
         config.DebugMode = debugModeCheck.Checked;
 

@@ -16,6 +16,7 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Entry<string> languageEntry;
         private static MelonPreferences_Entry<bool> speechLogEntry;
         private static MelonPreferences_Entry<bool> debugModeEntry;
+        private static MelonPreferences_Entry<bool> itemDescriptionsEntry;
         private static MelonPreferences_Entry<string> seenAreaIntrosEntry;
 
         public static void Initialize()
@@ -57,6 +58,12 @@ namespace AccessibilityMod.Settings
 
             seenAreaIntrosEntry = category.CreateEntry<string>("SeenAreaIntros", "",
                 "Areas whose long first-visit introduction has already been spoken (comma-separated)");
+
+            // Off by default: the description is one to three sentences, and hearing it after
+            // every single item while scanning a room would bury the scan. On, it is read
+            // with the item; off, it waits for the key.
+            itemDescriptionsEntry = category.CreateEntry<bool>("ItemDescriptions", false,
+                "Always read an item's description along with its name (otherwise only on the describe-item key)");
 
             MelonLogger.Msg($"[PREFERENCES] Initialized - Dialog: {GetDialogMode()}, Orbs: {GetOrbAnnouncements()}, Interrupt: {GetSpeechInterrupt()}, AudioCaptions: {GetSpeakAudioCaptions()}");
         }
@@ -121,6 +128,17 @@ namespace AccessibilityMod.Settings
             seenAreaIntrosEntry.Value = string.IsNullOrEmpty(seenAreaIntrosEntry.Value)
                 ? sceneName
                 : seenAreaIntrosEntry.Value + "," + sceneName;
+            category.SaveToFile();
+        }
+
+        public static bool GetItemDescriptions()
+        {
+            return itemDescriptionsEntry.Value;
+        }
+
+        public static void SetItemDescriptions(bool enabled)
+        {
+            itemDescriptionsEntry.Value = enabled;
             category.SaveToFile();
         }
 

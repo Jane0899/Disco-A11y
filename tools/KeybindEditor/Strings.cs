@@ -42,6 +42,9 @@ public static class Strings
         ["SpeakAudioCaptions"] = ("Speak sound captions", "Geräusch-Untertitel vorlesen"),
         ["DialogAutoAdvance"] = ("Auto-advance dialog after reading (autoread)", "Dialog nach dem Vorlesen automatisch weiterschalten (Autoread)"),
         ["AutoInteract"] = ("Auto-interact on arrival", "Bei Ankunft automatisch interagieren"),
+        ["ItemDescriptions"] = (
+            "Always read an item's description with its name (otherwise only on the describe key, B)",
+            "Item-Beschreibung immer mit vorlesen (sonst nur auf Tastendruck, Taste B)"),
         ["DebugGroup"] = ("Debug (for working on the mod)", "Debug (zum Arbeiten am Mod)"),
         ["DebugMode"] = (
             "Debug mode: announce every screen the game switches to, including internal ones (SPECIAL, LOBBY, CLEAR), and enable Ctrl+N (name sources of the selected object)",

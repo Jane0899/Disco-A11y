@@ -114,6 +114,9 @@ namespace AccessibilityMod.Settings
             // taken) and in the same physical spot on QWERTY and QWERTZ.
             [GameKey.DescribeArea] = new KeyBinding(KeyCode.U),
             [GameKey.DescribeAreaFull] = new KeyBinding(KeyCode.U, requireCtrl: true),
+            // B: free in the game's own bindings, and it is the same key in every preset -
+            // "describe what I have selected" is not something to hunt for.
+            [GameKey.DescribeItem] = new KeyBinding(KeyCode.B),
         };
 
         /// <summary>
@@ -176,6 +179,9 @@ namespace AccessibilityMod.Settings
             // taken) and in the same physical spot on QWERTY and QWERTZ.
             [GameKey.DescribeArea] = new KeyBinding(KeyCode.U),
             [GameKey.DescribeAreaFull] = new KeyBinding(KeyCode.U, requireCtrl: true),
+            // B: free in the game's own bindings, and it is the same key in every preset -
+            // "describe what I have selected" is not something to hunt for.
+            [GameKey.DescribeItem] = new KeyBinding(KeyCode.B),
         };
 
         /// <summary>
