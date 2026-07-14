@@ -62,6 +62,10 @@
       <HintPath>$(DISCO_ELYSIUM_PATH)\MelonLoader\Il2CppAssemblies\UnityEngine.UIModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.AIModule">
+      <HintPath>$(DISCO_ELYSIUM_PATH)\MelonLoader\Il2CppAssemblies\UnityEngine.AIModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Il2CppInControl">
       <HintPath>$(DISCO_ELYSIUM_PATH)\MelonLoader\Il2CppAssemblies\Il2CppInControl.dll</HintPath>
       <Private>False</Private>

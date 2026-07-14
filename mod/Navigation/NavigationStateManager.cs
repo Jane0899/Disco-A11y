@@ -40,6 +40,7 @@ namespace AccessibilityMod.Navigation
         {
             try
             {
+                lastScanTime = Time.unscaledTime;
                 // Get current objects from registry
                 var registry = MouseOverHighlight.registry;
                 if (registry == null || registry.Count == 0)
@@ -57,7 +58,7 @@ namespace AccessibilityMod.Navigation
                     float maxDistance = ObjectCategorizer.GetMaxDistanceForCategory(ObjectCategory.Everything);
                     foreach (var obj in registry)
                     {
-                        if (obj == null || obj.transform == null) continue;
+                        if (!Utils.GameObjectUtils.IsActuallyInWorld(obj)) continue;
 
                         float distance = Vector3.Distance(playerPos, obj.transform.position);
                         if (distance > maxDistance) continue;
@@ -72,7 +73,7 @@ namespace AccessibilityMod.Navigation
                     // Normal categorization for specific categories
                     foreach (var obj in registry)
                     {
-                        if (obj == null || obj.transform == null) continue;
+                        if (!Utils.GameObjectUtils.IsActuallyInWorld(obj)) continue;
 
                         float distance = Vector3.Distance(playerPos, obj.transform.position);
 
@@ -145,6 +146,42 @@ namespace AccessibilityMod.Navigation
             if (selectedObjectIndex >= objects.Count) return null;
             
             return objects[selectedObjectIndex];
+        }
+
+        private float lastScanTime;
+
+        /// <summary>
+        /// Rebuilds the current category when the snapshot has gone stale, keeping the
+        /// selection where it was.
+        ///
+        /// The list is a snapshot from the moment a category key was pressed, and the
+        /// world moves on without it: the player opened a door, walked through, and the
+        /// list kept offering him the old room - the balcony and the money on the other
+        /// side simply did not exist for him until he re-selected the category by hand.
+        /// Refreshing only after a pause (not between quick successive presses) keeps
+        /// the cycling order stable under the player's fingers.
+        /// </summary>
+        public void RefreshIfStale(Vector3 playerPos)
+        {
+            const float STALE_AFTER_SECONDS = 4f;
+            if (Time.unscaledTime - lastScanTime < STALE_AFTER_SECONDS) return;
+
+            var previous = GetCurrentSelectedObject();
+            int previousId = previous != null ? previous.GetInstanceID() : 0;
+
+            UpdateCategorizedObjects(playerPos, currentCategory);
+
+            if (previousId == 0 || !categorizedObjects.TryGetValue(currentCategory, out var objects)) return;
+            for (int i = 0; i < objects.Count; i++)
+            {
+                if (objects[i] != null && objects[i].GetInstanceID() == previousId)
+                {
+                    selectedObjectIndex = i;
+                    return;
+                }
+            }
+            // The selected object is gone from the category (taken, emptied, despawned) -
+            // the index stays at the top and the next cycle starts from the closest object.
         }
 
         public void CycleToNextObject()

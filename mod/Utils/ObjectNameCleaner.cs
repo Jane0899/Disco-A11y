@@ -68,10 +68,6 @@ namespace AccessibilityMod.Utils
             }
         }
 
-        // Walking the item database per object is far too slow to redo on every
-        // announcement, and an object's item never changes.
-        private static readonly System.Collections.Generic.Dictionary<int, string> pickupNameCache = new();
-
         /// <summary>
         /// The real, localized name of a pick-up-able object, or null if it isn't one.
         ///
@@ -86,12 +82,32 @@ namespace AccessibilityMod.Utils
         {
             try
             {
-                int id = obj.GetInstanceID();
-                if (pickupNameCache.TryGetValue(id, out var cached)) return cached;
+                // Resolved live, not cached: a cached name outlives the loot. The player
+                // emptied the tape pile and it kept announcing itself as "Leere
+                // Tonbandspule, 1 of 1" in the loot list - an item that no longer existed.
+                // The lookup is a component walk plus one dictionary hit, and it only runs
+                // during scans and selection changes, never per frame.
+                return ResolvePickupItemName(obj);
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
-                string resolved = ResolvePickupItemName(obj);
-                pickupNameCache[id] = resolved; // null is cached too - don't redo the lookup
-                return resolved;
+        /// <summary>
+        /// Whether there is actually something to take here: true/false for containers,
+        /// null for objects that are not containers at all.
+        /// </summary>
+        public static bool? HasLootableContents(MouseOverHighlight obj)
+        {
+            try
+            {
+                var source = obj.GetComponentInParent<Il2CppSunshine.ContainerSource>()
+                             ?? obj.GetComponentInChildren<Il2CppSunshine.ContainerSource>();
+                if (source == null) return null;
+                var items = source.containedItems;
+                return items != null && items.Count > 0;
             }
             catch
             {
@@ -115,9 +131,6 @@ namespace AccessibilityMod.Utils
 
             return RTLHelper.FixForScreenReader(display.Trim());
         }
-
-        /// <summary>Scene changes recycle instance IDs, so the cache must not outlive a scene.</summary>
-        public static void ClearPickupNameCache() => pickupNameCache.Clear();
 
         private static string FormatObjectName(string rawName)
         {

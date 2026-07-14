@@ -37,8 +37,13 @@ namespace AccessibilityMod.Navigation
                     return ObjectCategory.Locations;
                 }
                 
-                // Check for loot and containers - searchable items
-                if (IsLootOrContainer(name, gameObjectName))
+                // Check for loot and containers - searchable items. A container that has
+                // been emptied is not loot anymore: the emptied tape pile kept announcing
+                // itself in the loot list as "1 of 1" - an item that no longer existed.
+                // The physical object stays in the world (sighted players still see the
+                // pile), so it stays under Everything, just not under Loot.
+                if (IsLootOrContainer(name, gameObjectName)
+                    && ObjectNameCleaner.HasLootableContents(obj) != false)
                 {
                     return ObjectCategory.Loot;
                 }

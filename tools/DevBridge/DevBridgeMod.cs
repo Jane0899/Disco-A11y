@@ -916,6 +916,41 @@ namespace DevBridge
                     }
                 }
 
+                // Runs the mod's reachability check on the selected object, step by step,
+                // so "reachable=unknown" stops being a shrug and starts naming the step
+                // that failed.
+                case "reach":
+                {
+                    var navInfo = nav?.StateManager?.GetCurrentSelectedObject();
+                    if (navInfo == null) return "nothing selected";
+
+                    var playerPos = GameObjectUtils.GetPlayerPosition();
+                    var targetPos = navInfo.transform.position;
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"target: {navInfo.gameObject.name} at {targetPos}");
+                    sb.AppendLine($"player: {playerPos}, distance {UnityEngine.Vector3.Distance(playerPos, targetPos):F1}m");
+
+                    bool playerOk = UnityEngine.AI.NavMesh.SamplePosition(playerPos, out var ph, 2.0f, UnityEngine.AI.NavMesh.AllAreas);
+                    sb.AppendLine($"player on navmesh: {playerOk}" + (playerOk ? $" (snapped {UnityEngine.Vector3.Distance(playerPos, ph.position):F2}m)" : ""));
+
+                    bool targetOk = UnityEngine.AI.NavMesh.SamplePosition(targetPos, out var th, 3.0f, UnityEngine.AI.NavMesh.AllAreas);
+                    sb.AppendLine($"target on navmesh: {targetOk}" + (targetOk ? $" (snapped {UnityEngine.Vector3.Distance(targetPos, th.position):F2}m)" : ""));
+
+                    if (playerOk && targetOk)
+                    {
+                        var path = new UnityEngine.AI.NavMeshPath();
+                        bool calc = UnityEngine.AI.NavMesh.CalculatePath(ph.position, th.position, UnityEngine.AI.NavMesh.AllAreas, path);
+                        sb.AppendLine($"path calculated: {calc}, status: {path.status}, corners: {path.corners?.Length ?? 0}");
+                        var corners = path.corners;
+                        if (corners != null && corners.Length > 0)
+                        {
+                            sb.AppendLine($"path ends {UnityEngine.Vector3.Distance(corners[corners.Length - 1], targetPos):F1}m from target");
+                        }
+                    }
+
+                    return sb.ToString();
+                }
+
                 case "devmode":
                 {
                     var modes = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.DebugModes>();

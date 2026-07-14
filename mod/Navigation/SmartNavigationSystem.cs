@@ -358,6 +358,10 @@ namespace AccessibilityMod.Navigation
                     return;
                 }
 
+                // A stale snapshot lies: after a door opens, the old list keeps offering
+                // the old room. Refresh it (keeping the selection) before moving on.
+                stateManager.RefreshIfStale(GameObjectUtils.GetPlayerPosition());
+
                 if (!stateManager.HasSelection)
                 {
                     TolkScreenReader.Instance.Speak("No objects in current category. Press [ for NPCs, ] for locations, \\ for containers, = for everything, or Ctrl plus [ for waypoints.", true);
@@ -653,7 +657,7 @@ namespace AccessibilityMod.Navigation
                 
                 foreach (var obj in registry)
                 {
-                    if (obj == null || obj.transform == null) continue;
+                    if (!Utils.GameObjectUtils.IsActuallyInWorld(obj)) continue;
                     
                     float distance = Vector3.Distance(playerPos, obj.transform.position);
                     string name = ObjectNameCleaner.GetBetterObjectName(obj);
@@ -730,7 +734,7 @@ namespace AccessibilityMod.Navigation
                 
                 foreach (var obj in registry)
                 {
-                    if (obj == null || obj.transform == null) continue;
+                    if (!Utils.GameObjectUtils.IsActuallyInWorld(obj)) continue;
                     
                     float distance = Vector3.Distance(playerPos, obj.transform.position);
                     string name = ObjectNameCleaner.GetBetterObjectName(obj);
