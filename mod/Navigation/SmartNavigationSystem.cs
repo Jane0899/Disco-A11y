@@ -51,13 +51,32 @@ namespace AccessibilityMod.Navigation
             movementController = new MovementController();
             waypointManager = new WaypointManager();
             movementController.OnMovementCompleted += OnArrived;
+            // A walk that never got there cannot be followed by the interaction it was for -
+            // otherwise the next press of the key would wrongly report "still out of reach".
+            movementController.OnMovementFailed += _ => interactAfterArrival = false;
         }
+
+        /// <summary>The interact key was pressed on something out of reach - walk there, then interact.</summary>
+        private bool interactAfterArrival;
 
         private void OnArrived(string _)
         {
-            if (!lastNavigationTargetWasObject) return;
+            if (!lastNavigationTargetWasObject)
+            {
+                interactAfterArrival = false;
+                return;
+            }
 
             TutorialGuide.OnArrivalAtObject();
+
+            // The walk the interact key started: finish what it was for, whatever the
+            // auto-interact setting says - the player asked for this interaction by name.
+            if (interactAfterArrival)
+            {
+                InteractWithSelectedObject();
+                return;
+            }
+
             if (!AccessibilityPreferences.GetAutoInteract()) return;
 
             InteractWithSelectedObject();
@@ -477,13 +496,41 @@ namespace AccessibilityMod.Navigation
 
                 string objectName = ObjectNameCleaner.GetBetterObjectName(selectedObject);
 
+                // Out of reach used to be a dead end: "X is too far away, walk there first" -
+                // and the player HAD walked there, the mod had just announced "Arrived at X".
+                // (Reported by a tester standing in front of the cafeteria manager, unable to
+                // talk to him.) "Arrived" only means within two metres of the object's origin;
+                // the game's interaction radius is its own, smaller thing, so the two can
+                // disagree and the player is left with no way forward.
+                //
+                // A sighted player clicks the man and the character walks over and talks. So
+                // that is what the key does now: if it is out of reach, walk there and
+                // interact on arrival - once. A second refusal after actually standing there
+                // is reported honestly instead of sending the player walking in circles.
                 var entity = selectedObject.GetFirstActive();
                 Vector3 playerPos = GameObjectUtils.GetPlayerPosition();
-                if (entity != null && playerPos != Vector3.zero && !entity.IsWithinInteractionRadius(playerPos))
+                bool outOfReach = entity != null && playerPos != Vector3.zero
+                                  && !entity.IsWithinInteractionRadius(playerPos);
+
+                if (outOfReach && !interactAfterArrival)
                 {
-                    TolkScreenReader.Instance.Speak($"{objectName} is too far away. Press {KeyBindings.SpeakableName(GameKey.NavigateToSelected)} to walk there first.", true);
+                    interactAfterArrival = true;
+                    TolkScreenReader.Instance.Speak(Loc.Get("InteractWalkingThere", objectName), true);
+                    NavigateToSelectedObject();
                     return;
                 }
+
+                // Walked there and the radius check STILL says no. Do not refuse a second time:
+                // that check is ours, and it has now been wrong once in front of a player who
+                // was standing at the man she needed to question. Let the game have the last
+                // word - it either starts the conversation or it does not, and if it does not,
+                // the failure below says so plainly.
+                if (outOfReach)
+                {
+                    MelonLogger.Msg($"[SMART NAV] {objectName}: arrived but still outside the interaction radius - interacting anyway.");
+                }
+
+                interactAfterArrival = false;
 
                 // Locked doors accept the click but the game reacts with nothing at all
                 // (no dialogue, no panel - verified live), so say why before it goes quiet.

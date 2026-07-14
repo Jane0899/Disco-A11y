@@ -125,6 +125,9 @@ namespace AccessibilityMod.Settings
                 "Für diesen Bereich gibt es noch keine Beschreibung."),
             // Item names in this game are proper nouns from its own world ("Glastara") -
             // meaningless without the description a sighted player reads in the tooltip.
+            ["InteractWalkingThere"] = (
+                "{0} is out of reach. Walking there, then interacting.",
+                "{0} ist außer Reichweite. Ich laufe hin und interagiere dann."),
             ["ItemNoSelection"] = (
                 "Nothing selected. Choose an object first.",
                 "Nichts ausgewählt. Wähle zuerst ein Objekt."),
