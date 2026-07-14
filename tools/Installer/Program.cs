@@ -252,10 +252,6 @@ internal static class Program
                 });
             }
 
-            Log(ModInstaller.InstallModDebugger(gamePath)
-                ? "Mod debugger installed - Ctrl+Y opens it in game once debug mode is on."
-                : "Mod debugger not found next to this installer - skipped.");
-
             var exe = KeybindEditorLocator.Find();
             if (exe != null)
             {

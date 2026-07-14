@@ -85,36 +85,6 @@ public static class ModInstaller
         return DevBridgeResult.Absent;
     }
 
-    /// <summary>
-    /// Puts the mod debugger into the game folder, where the mod's Ctrl+Y looks for it.
-    ///
-    /// Not a checkbox: the key is already behind debug mode, so an exe sitting unused in the
-    /// folder costs nothing - whereas a player who switches debug mode on and presses Ctrl+Y
-    /// only to be told the tool is missing has to go and find a zip.
-    /// </summary>
-    public static bool InstallModDebugger(string gamePath)
-    {
-        const string exeName = "DiscoElysiumModDebugger.exe";
-
-        var source = Path.Combine(Program.BundleDir, exeName);
-        if (!File.Exists(source)) source = Path.Combine(AppContext.BaseDirectory, exeName);
-        if (!File.Exists(source)) return false;
-
-        try
-        {
-            File.Copy(source, Path.Combine(gamePath, exeName), overwrite: true);
-            return true;
-        }
-        catch (IOException)
-        {
-            return false;   // in use (debugger open) - the copy already there still works
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
     private static string VersionMarkerPath(string gamePath) =>
         Path.Combine(gamePath, "Mods", "AccessibilityMod.version.txt");
 
@@ -261,8 +231,20 @@ public static class ModInstaller
         }
     }
 
+    /// <summary>
+    /// Where the release's files actually start inside the extracted zip.
+    ///
+    /// A zip may wrap everything in one folder ("DiscoElysiumAccessibilityMod-nightly/") or
+    /// have the files at the top. Blindly descending into a single subfolder gets the second
+    /// layout catastrophically wrong: it descends into "Mods/", finds no "Mods/Mods/..." to
+    /// copy, silently installs NOTHING - and still writes the version marker, so the
+    /// installer reports success and the player runs the old build believing it is new.
+    /// The marker is the presence of "Mods", not the number of folders.
+    /// </summary>
     private static string FindExtractedRoot(string extractPath)
     {
+        if (Directory.Exists(Path.Combine(extractPath, "Mods"))) return extractPath;
+
         var subdirs = Directory.GetDirectories(extractPath);
         if (subdirs.Length == 1) return subdirs[0];
         return extractPath;
@@ -273,9 +255,23 @@ public static class ModInstaller
         var modsPath = Path.Combine(gamePath, "Mods");
         Directory.CreateDirectory(modsPath);
 
-        CopyFile(Path.Combine(extractedRoot, "Mods", "AccessibilityMod.dll"), Path.Combine(modsPath, "AccessibilityMod.dll"), statusCallback);
+        // Without this the installer could copy nothing at all, report success, and leave the
+        // player with the old build and a version marker that lies about it. If the mod is not
+        // in the package, the package is broken - say so.
+        var modDll = Path.Combine(extractedRoot, "Mods", "AccessibilityMod.dll");
+        if (!File.Exists(modDll))
+        {
+            throw new Exception(Strings.Get("ReleasePackageBroken"));
+        }
+
+        CopyFile(modDll, Path.Combine(modsPath, "AccessibilityMod.dll"), statusCallback);
         CopyFile(Path.Combine(extractedRoot, "Tolk.dll"), Path.Combine(gamePath, "Tolk.dll"), statusCallback);
         CopyFile(Path.Combine(extractedRoot, "nvdaControllerClient64.dll"), Path.Combine(gamePath, "nvdaControllerClient64.dll"), statusCallback);
+        // The debugger is part of the mod (Ctrl+Y, and only when debug mode is on), so it
+        // travels in the mod's own release zip and lands in the game folder like everything
+        // else the mod needs. No separate channel to keep in step with the release.
+        CopyFile(Path.Combine(extractedRoot, "DiscoElysiumModDebugger.exe"),
+                 Path.Combine(gamePath, "DiscoElysiumModDebugger.exe"), statusCallback);
 
         var userDataSource = Path.Combine(extractedRoot, "UserData");
         if (Directory.Exists(userDataSource))

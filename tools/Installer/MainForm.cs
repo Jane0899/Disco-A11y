@@ -173,10 +173,6 @@ public sealed class MainForm : Form
             var bridgeResult = ModInstaller.SetDevBridgeEnabled(gamePath, devBridgeCheck.Checked);
             LogDevBridgeResult(bridgeResult);
 
-            Log(ModInstaller.InstallModDebugger(gamePath)
-                ? Strings.Get("StepDebuggerInstalled")
-                : Strings.Get("StepDebuggerMissing"));
-
             CreateStartMenuShortcut(gamePath);
 
             Tolk.Speak(Strings.Get("InstallCompleteDialog"));

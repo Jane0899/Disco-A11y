@@ -24,6 +24,10 @@ public static class SelfUpdater
     public static string LocalBuildId => GetMetadata("BuildId") ?? "dev";
     private static string Flavor => GetMetadata("Flavor") ?? "framework";
 
+    /// <summary>This binary is one of the retired self-contained builds - it is about to be
+    /// replaced by one that needs the .NET desktop runtime installed.</summary>
+    public static bool IsRetiredStandalone => Flavor == "standalone";
+
     private static string GetMetadata(string key) =>
         Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>()
             .FirstOrDefault(a => a.Key == key)?.Value;
@@ -73,10 +77,13 @@ public static class SelfUpdater
 
         try
         {
-            var assetName = Flavor == "standalone" ? "DiscoElysiumSetup-standalone.exe" : "DiscoElysiumSetup.exe";
-
+            // One asset, one path. The self-contained "standalone" flavor is retired: it was a
+            // 68 MB download that existed only to carry a .NET runtime the user can install once
+            // and then have for every tool here. An old standalone binary updates itself to this
+            // one and tells the user to install the runtime (see UpdateForm) rather than keeping
+            // a second release asset alive forever.
             using var http = CreateClient();
-            using (var response = await http.GetAsync($"{ReleaseUrl}/{assetName}", HttpCompletionOption.ResponseHeadersRead))
+            using (var response = await http.GetAsync($"{ReleaseUrl}/DiscoElysiumSetup.exe", HttpCompletionOption.ResponseHeadersRead))
             {
                 response.EnsureSuccessStatusCode();
 

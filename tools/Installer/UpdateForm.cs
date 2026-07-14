@@ -50,7 +50,12 @@ public sealed class UpdateForm : Form
             Top = 16,
             Width = 570,
             Height = 90,
-            Text = Strings.Get("UpdateConfirm", newVersion),
+            // The self-contained build is retired. Someone still running one is about to be
+            // updated into a build that needs the .NET desktop runtime - say so before it
+            // happens, not afterwards when the window simply fails to come back.
+            Text = SelfUpdater.IsRetiredStandalone
+                ? Strings.Get("UpdateConfirm", newVersion) + " " + Strings.Get("StandaloneRetired")
+                : Strings.Get("UpdateConfirm", newVersion),
         };
 
         progressBar = new ProgressBar
