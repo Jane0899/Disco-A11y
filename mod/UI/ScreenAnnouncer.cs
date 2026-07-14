@@ -66,7 +66,18 @@ namespace AccessibilityMod.UI
                 // The game switches views constantly while you just play (CLEAR, SPECIAL,
                 // DIALOGUE, CUTSCENE...). Only the screens a player deliberately opens are
                 // worth saying out loud - those are exactly the ones with a name below.
-                if (!IsPlayerScreen(viewType)) return;
+                // In debug mode the internal ones are announced too, raw: when you are
+                // working on the mod, "the game is in SPECIAL" is exactly what you need to
+                // hear - that is the boot screen, and it is why a load hangs there.
+                if (!IsPlayerScreen(viewType))
+                {
+                    if (AccessibilityPreferences.GetDebugMode())
+                    {
+                        TolkScreenReader.Instance.Speak(
+                            Loc.Get("DebugScreen", viewName), false, AnnouncementCategory.Queueable);
+                    }
+                    return;
+                }
 
                 Announce(view, viewType);
             }

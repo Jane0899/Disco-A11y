@@ -316,9 +316,18 @@ namespace AccessibilityMod.Input
             // Diagnostics: where the selected object's name comes from. Reports only - a
             // player who cannot see the object has no other way to tell a wrong name from
             // a merely odd one.
+            // Under the debug-mode umbrella: it reports where a name comes from, which is a
+            // question you only ask while working on the mod, not while playing.
             if (KeyBindings.IsPressed(GameKey.AnnounceNameSources))
             {
-                Utils.NameSourceReporter.AnnounceForSelected(navigationSystem);
+                if (AccessibilityPreferences.GetDebugMode())
+                {
+                    Utils.NameSourceReporter.AnnounceForSelected(navigationSystem);
+                }
+                else
+                {
+                    TolkScreenReader.Instance.Speak(Loc.Get("DebugModeOff"), true);
+                }
             }
 
             // Describe the area again - what a sighted player can simply look at twice.

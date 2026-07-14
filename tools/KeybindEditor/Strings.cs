@@ -42,6 +42,10 @@ public static class Strings
         ["SpeakAudioCaptions"] = ("Speak sound captions", "Geräusch-Untertitel vorlesen"),
         ["DialogAutoAdvance"] = ("Auto-advance dialog after reading (autoread)", "Dialog nach dem Vorlesen automatisch weiterschalten (Autoread)"),
         ["AutoInteract"] = ("Auto-interact on arrival", "Bei Ankunft automatisch interagieren"),
+        ["DebugGroup"] = ("Debug (for working on the mod)", "Debug (zum Arbeiten am Mod)"),
+        ["DebugMode"] = (
+            "Debug mode: announce every screen the game switches to, including internal ones (SPECIAL, LOBBY, CLEAR), and enable Ctrl+N (name sources of the selected object)",
+            "Debug-Modus: jeden Bildschirmwechsel ansagen, auch die internen (SPECIAL, LOBBY, CLEAR), und Strg+N freischalten (Namensquellen des gewählten Objekts)"),
         ["SpeechLog"] = (
             "Write everything spoken to UserData\\SpeechLog.txt (diagnostics - lets you look up afterwards what was said)",
             "Alles Gesprochene in UserData\\SpeechLog.txt mitschreiben (Diagnose - zum späteren Nachlesen, was gesagt wurde)"),

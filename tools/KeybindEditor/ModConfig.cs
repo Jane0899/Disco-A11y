@@ -20,6 +20,7 @@ public sealed class ModConfig
     public bool DialogAutoAdvance { get; set; } = false;
     public bool AutoInteract { get; set; } = false;
     public bool SpeechLog { get; set; } = false;
+    public bool DebugMode { get; set; } = false;
 
     /// <summary>
     /// Actions that were not present in the loaded file and therefore fell back to
@@ -129,6 +130,10 @@ public sealed class ModConfig
                     config.SpeechLog = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
 
+                case "DebugMode":
+                    config.DebugMode = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    break;
+
                 case "AutoInteract":
                     config.AutoInteract = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
@@ -154,6 +159,7 @@ public sealed class ModConfig
         sb.AppendLine($"DialogAutoAdvance = {(DialogAutoAdvance ? "true" : "false")}");
         sb.AppendLine($"AutoInteract = {(AutoInteract ? "true" : "false")}");
         sb.AppendLine($"SpeechLog = {(SpeechLog ? "true" : "false")}");
+        sb.AppendLine($"DebugMode = {(DebugMode ? "true" : "false")}");
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, sb.ToString());

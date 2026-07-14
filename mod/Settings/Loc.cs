@@ -115,6 +115,11 @@ namespace AccessibilityMod.Settings
             ["NameSourceItem"] = ("item database: {0}.", "Item-Datenbank: {0}."),
             ["NameSourceDialogue"] = ("dialogue database: {0}.", "Dialog-Datenbank: {0}."),
             ["NameSourceNone"] = ("nothing", "nichts"),
+            // Debug mode only: the game's internal screens, said out loud by their raw name.
+            ["DebugScreen"] = ("Screen: {0}.", "Bildschirm: {0}."),
+            ["DebugModeOff"] = (
+                "Debug mode is off. Switch it on in the mod configurator to use this key.",
+                "Der Debug-Modus ist aus. Schalte ihn im Konfigurator ein, um diese Taste zu nutzen."),
             ["AreaNoDescription"] = (
                 "This area has no description yet.",
                 "Für diesen Bereich gibt es noch keine Beschreibung."),

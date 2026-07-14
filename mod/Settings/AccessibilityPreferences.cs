@@ -15,6 +15,7 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Entry<bool> tutorialTipsEntry;
         private static MelonPreferences_Entry<string> languageEntry;
         private static MelonPreferences_Entry<bool> speechLogEntry;
+        private static MelonPreferences_Entry<bool> debugModeEntry;
 
         public static void Initialize()
         {
@@ -47,6 +48,11 @@ namespace AccessibilityMod.Settings
 
             speechLogEntry = category.CreateEntry<bool>("SpeechLog", false,
                 "Write everything the mod says to UserData/SpeechLog.txt, with timestamps");
+
+            // The umbrella over everything diagnostic: announcements that only make sense
+            // when you are working ON the mod rather than playing with it.
+            debugModeEntry = category.CreateEntry<bool>("DebugMode", false,
+                "Debug mode: announce internal screens (SPECIAL, LOBBY, ...) and enable the name-sources key");
 
             MelonLogger.Msg($"[PREFERENCES] Initialized - Dialog: {GetDialogMode()}, Orbs: {GetOrbAnnouncements()}, Interrupt: {GetSpeechInterrupt()}, AudioCaptions: {GetSpeakAudioCaptions()}");
         }
@@ -97,6 +103,17 @@ namespace AccessibilityMod.Settings
         public static void SetDialogAutoAdvance(bool enabled)
         {
             dialogAutoAdvanceEntry.Value = enabled;
+            category.SaveToFile();
+        }
+
+        public static bool GetDebugMode()
+        {
+            return debugModeEntry.Value;
+        }
+
+        public static void SetDebugMode(bool enabled)
+        {
+            debugModeEntry.Value = enabled;
             category.SaveToFile();
         }
 
