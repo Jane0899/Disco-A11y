@@ -85,6 +85,28 @@ namespace AccessibilityMod.Input
                 return;
             }
 
+            // With the journal's map tab open, the cycling keys move through the travel
+            // destinations instead of world objects (which they could not reach from
+            // inside a menu anyway), and the interact key travels.
+            if (UI.MapNavigationHandler.IsMapOpen)
+            {
+                if (KeyBindings.IsPressed(GameKey.CycleForward))
+                {
+                    UI.MapNavigationHandler.CycleDestination(false);
+                    return;
+                }
+                if (KeyBindings.IsPressed(GameKey.CycleBackward))
+                {
+                    UI.MapNavigationHandler.CycleDestination(true);
+                    return;
+                }
+                if (KeyBindings.IsPressed(GameKey.InteractWithSelected))
+                {
+                    UI.MapNavigationHandler.TravelToSelected();
+                    return;
+                }
+            }
+
             // Toggle sorting mode - toggles between distance and directional sorting
             if (KeyBindings.IsPressed(GameKey.ToggleSortingMode))
             {

@@ -115,6 +115,22 @@ namespace AccessibilityMod.Settings
             ["NameSourceItem"] = ("item database: {0}.", "Item-Datenbank: {0}."),
             ["NameSourceDialogue"] = ("dialogue database: {0}.", "Dialog-Datenbank: {0}."),
             ["NameSourceNone"] = ("nothing", "nichts"),
+            // The journal's map tab: keyboard access to the travel destinations.
+            ["MapOpened"] = (
+                "Map. {0} travel destinations. {1} to cycle, {2} to travel.",
+                "Karte. {0} Reiseziele. {1} zum Blättern, {2} zum Reisen."),
+            ["MapNoDestinations"] = (
+                "No travel destinations on the map yet.",
+                "Noch keine Reiseziele auf der Karte."),
+            ["MapNothingSelected"] = (
+                "No destination selected. Cycle to one first.",
+                "Kein Reiseziel ausgewählt. Blättere zuerst zu einem."),
+            ["MapAlreadyHere"] = (
+                "You are already there.",
+                "Dort bist du bereits."),
+            ["MapTravelling"] = (
+                "Travelling to {0}.",
+                "Reise nach {0}."),
             ["DialogEnded"] = (
                 "Conversation ended.",
                 "Dialog beendet."),
