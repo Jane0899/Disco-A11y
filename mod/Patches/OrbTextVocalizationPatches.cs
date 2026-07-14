@@ -35,30 +35,110 @@ namespace AccessibilityMod.Patches
             AccessibilityPreferences.SetOrbAnnouncements(orbAnnouncementsEnabled);
         }
 
+        // Ambient sources loop: the room's radio rotates half a dozen weather reports at a
+        // few seconds each, forever, and every line landed in the player's ear mid-task.
+        // Each distinct line is spoken once and then suppressed for a while - the first
+        // pass through the playlist is information, the fifth is noise.
+        private const float REPEAT_SUPPRESSION_SECONDS = 180f;
+        private static readonly System.Collections.Generic.Dictionary<string, float> spokenFloats = new();
+        private static string spokenFloatsScene = "";
+
+        /// <summary>
+        /// Who the speech bubble belongs to. A sighted player sees the bubble hanging
+        /// over the radio or over a person; without the name, a weather report is a
+        /// poltergeist and a "Hello, officer" comes out of nowhere.
+        /// </summary>
+        private static string DescribeSpeaker(Transform target)
+        {
+            try
+            {
+                if (target == null) return null;
+
+                var highlight = target.GetComponentInParent<Il2CppFortressOccident.MouseOverHighlight>();
+                if (highlight != null) return ObjectNameCleaner.GetBetterObjectName(highlight);
+
+                var entity = target.GetComponentInParent<Il2CppFortressOccident.GameEntity>();
+                if (entity != null && !string.IsNullOrEmpty(entity.name))
+                    return ObjectNameCleaner.CleanObjectName(entity.name);
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         /// <summary>
         /// Helper method to announce orb text with duplicate detection
         /// </summary>
-        private static void AnnounceOrbText(string text, string prefix = "Orb text")
+        /// <summary>
+        /// The comparison key for "have I already said this line?". The same line reaches
+        /// us through several patch paths and they do not agree on the details: one carries
+        /// rich-text markup, another curly quotes where the first has straight ones, a third
+        /// a stray line break. Comparing the raw strings let every one of those differences
+        /// through as a fresh line, and the player heard each orb twice. The key throws away
+        /// everything that does not change what is spoken.
+        /// </summary>
+        private static string DedupKey(string text)
+        {
+            string key = System.Text.RegularExpressions.Regex.Replace(text, "<[^>]+>", "");
+            key = key.Replace('“', '"').Replace('”', '"').Replace('„', '"')
+                     .Replace('‘', '\'').Replace('’', '\'')
+                     .Replace('–', '-').Replace('—', '-')
+                     .Replace(' ', ' ');
+            key = System.Text.RegularExpressions.Regex.Replace(key, @"\s+", " ");
+            return key.Trim().ToLowerInvariant();
+        }
+
+        private static void AnnounceOrbText(string text, Transform target = null, string prefix = "Orb text")
         {
             if (!orbAnnouncementsEnabled || string.IsNullOrEmpty(text))
                 return;
 
-            string trimmedText = RTLHelper.FixForScreenReader(text.Trim());
+            // Markup is stripped from what gets spoken too - "das hier <i>IST</i> gestört"
+            // must not reach the screen reader as tags.
+            string trimmedText = System.Text.RegularExpressions.Regex.Replace(text, "<[^>]+>", "");
+            trimmedText = RTLHelper.FixForScreenReader(trimmedText.Trim());
+            if (string.IsNullOrEmpty(trimmedText)) return;
+
+            string key = DedupKey(text);
             float currentTime = Time.time;
 
             // Check if this is a duplicate within the cooldown period
-            if (trimmedText == lastAnnouncedOrbText &&
+            if (key == lastAnnouncedOrbText &&
                 (currentTime - lastOrbAnnouncementTime) < ORB_COOLDOWN)
             {
                 return;
             }
 
+            // Looping ambience: a line already spoken recently stays quiet. Kept per
+            // scene - other rooms, other radios.
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (scene != spokenFloatsScene)
+            {
+                spokenFloats.Clear();
+                spokenFloatsScene = scene;
+            }
+            if (spokenFloats.TryGetValue(key, out float firstSpoken)
+                && currentTime - firstSpoken < REPEAT_SUPPRESSION_SECONDS)
+            {
+                if (AccessibilityPreferences.GetDebugMode())
+                    MelonLogger.Msg($"[ORB] suppressed via {prefix} t={currentTime:F2} key=<{key}>");
+                return;
+            }
+            spokenFloats[key] = currentTime;
+
             // Update tracking
-            lastAnnouncedOrbText = trimmedText;
+            lastAnnouncedOrbText = key;
             lastOrbAnnouncementTime = currentTime;
 
-            // Announce the text
-            TolkScreenReader.Instance.Speak($"{prefix}: {trimmedText}", true, AnnouncementCategory.Queueable);
+            if (AccessibilityPreferences.GetDebugMode())
+                MelonLogger.Msg($"[ORB] spoken via {prefix} t={currentTime:F2} key=<{key}>");
+
+            string speaker = DescribeSpeaker(target);
+            string announcement = speaker != null ? $"{speaker}: {trimmedText}" : $"{prefix}: {trimmedText}";
+            TolkScreenReader.Instance.Speak(announcement, true, AnnouncementCategory.Queueable);
         }
         /// <summary>
         /// Patch for FloatFactory.ShowFloat(string, Transform) to vocalize text
@@ -69,7 +149,7 @@ namespace AccessibilityMod.Patches
         {
             try
             {
-                AnnounceOrbText(text);
+                AnnounceOrbText(text, target);
             }
             catch (Exception ex)
             {
@@ -86,7 +166,7 @@ namespace AccessibilityMod.Patches
         {
             try
             {
-                AnnounceOrbText(text);
+                AnnounceOrbText(text, target);
             }
             catch (Exception ex)
             {
@@ -108,11 +188,11 @@ namespace AccessibilityMod.Patches
                     string displayedText = __result.text;
                     if (!string.IsNullOrEmpty(displayedText))
                     {
-                        AnnounceOrbText(displayedText);
+                        AnnounceOrbText(displayedText, target);
                     }
                     else if (!string.IsNullOrEmpty(fallbackText))
                     {
-                        AnnounceOrbText(fallbackText);
+                        AnnounceOrbText(fallbackText, target);
                     }
                 }
             }
@@ -136,11 +216,11 @@ namespace AccessibilityMod.Patches
                     string displayedText = __result.text;
                     if (!string.IsNullOrEmpty(displayedText))
                     {
-                        AnnounceOrbText(displayedText);
+                        AnnounceOrbText(displayedText, target);
                     }
                     else if (!string.IsNullOrEmpty(fallbackText))
                     {
-                        AnnounceOrbText(fallbackText);
+                        AnnounceOrbText(fallbackText, target);
                     }
                 }
             }
@@ -159,7 +239,7 @@ namespace AccessibilityMod.Patches
         {
             try
             {
-                AnnounceOrbText(value, "Float text");
+                AnnounceOrbText(value, __instance != null ? __instance.transform : null, "Float text");
             }
             catch (Exception ex)
             {

@@ -112,6 +112,31 @@ namespace AccessibilityMod
             return SendSpeech(text, interrupt, true, category, source);
         }
 
+        /// <summary>
+        /// Fires once per line at the moment it actually goes to the screen reader - the
+        /// single source of truth for "what did the player hear?", shared by the transcript,
+        /// the dev bridge and any debugging tool.
+        ///
+        /// Listening on Speak() instead is a trap that already cost a debugging session: a
+        /// queued announcement passes through Speak twice (enqueue, then play), so a
+        /// listener there sees every queued line twice and reports duplicate speech that
+        /// the player never heard.
+        /// </summary>
+        public static event Action<string> Spoken;
+
+        private static void RaiseSpoken(string text)
+        {
+            try
+            {
+                Spoken?.Invoke(text);
+            }
+            catch (Exception ex)
+            {
+                // A misbehaving listener must never take the speech down with it.
+                MelonLogger.Warning($"[TOLK] Spoken listener failed: {ex.Message}");
+            }
+        }
+
         // Enable to log Unicode code points of text sent to the screen reader
         public bool DiagnosticLogging = false;
 
@@ -170,6 +195,7 @@ namespace AccessibilityMod
                 // the moment the player actually hears it, which is what the timestamps
                 // are supposed to mean.
                 SpeechLog.Write(text);
+                RaiseSpoken(text);
 
                 // Immediate announcement - speak right away
                 // Apply global interrupt setting - if enabled, always interrupt

@@ -70,11 +70,13 @@ namespace DevBridge
             responsePath = Path.Combine(bridgeDir, "response.txt");
 
             // Capture everything the accessibility mod speaks, so the bridge can report
-            // what a blind player would have heard.
+            // what a blind player would have heard. The mod raises this once per line at
+            // the moment it goes to the screen reader - hooking Speak() instead sees every
+            // queued line twice (enqueue + play) and invents duplicate speech that nobody
+            // heard, which is exactly the false trail this bridge is supposed to prevent.
             try
             {
-                var speak = AccessTools.Method(typeof(TolkScreenReader), "Speak");
-                HarmonyInstance.Patch(speak, postfix: new HarmonyMethod(typeof(DevBridgeMod), nameof(SpeakPostfix)));
+                TolkScreenReader.Spoken += OnSpoken;
             }
             catch (Exception ex)
             {
@@ -219,22 +221,12 @@ namespace DevBridge
             BroadcastEvent($"scene {sceneName}");
         }
 
-        private static string lastSpokenText;
-        private static DateTime lastSpokenAt;
-
-        private static void SpeakPostfix(string text)
+        private static void OnSpoken(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
             lock (spokenHistory)
             {
-                // Queued announcements pass through Speak twice (once on enqueue, once
-                // when the audio-aware queue actually plays them) - collapse the pair.
-                var now = DateTime.Now;
-                if (text == lastSpokenText && (now - lastSpokenAt).TotalSeconds < 2) return;
-                lastSpokenText = text;
-                lastSpokenAt = now;
-
-                spokenHistory.Add($"{now:HH:mm:ss.fff} {text}");
+                spokenHistory.Add($"{DateTime.Now:HH:mm:ss.fff} {text}");
                 if (spokenHistory.Count > SPOKEN_HISTORY_MAX) spokenHistory.RemoveAt(0);
             }
             BroadcastEvent($"spoken {text}");
