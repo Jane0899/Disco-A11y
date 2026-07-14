@@ -67,6 +67,9 @@ namespace AccessibilityMod.Settings
             ["ContainerTakeAll"] = (
                 "Taking everything.",
                 "Nehme alles."),
+            ["ContainerSingleTaken"] = (
+                "Picked up.",
+                "Aufgenommen."),
             ["ContainerClosed"] = (
                 "Container closed.",
                 "Container geschlossen."),

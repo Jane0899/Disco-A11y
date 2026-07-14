@@ -272,6 +272,7 @@ namespace AccessibilityMod
                 AnnounceAreaIfChanged();
                 SpeakPendingIntroIfReady();
 
+                Patches.ContainerPatches.Update();
                 UpdateNotifier.Update();
                 UI.ScreenAnnouncer.Update();
                 UI.ResponseListAnnouncer.Update();
