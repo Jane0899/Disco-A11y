@@ -38,8 +38,9 @@ namespace AccessibilityMod.Patches
         // Ambient sources loop: the room's radio rotates half a dozen weather reports at a
         // few seconds each, forever, and every line landed in the player's ear mid-task.
         // Each distinct line is spoken once and then suppressed for a while - the first
-        // pass through the playlist is information, the fifth is noise.
-        private const float REPEAT_SUPPRESSION_SECONDS = 180f;
+        // pass through the playlist is information, the fifth is noise. How long "a while"
+        // is comes from a shared player setting (AccessibilityPreferences.GetRepeatSuppression-
+        // Seconds), the same window that governs re-entered area descriptions.
         private static readonly System.Collections.Generic.Dictionary<string, float> spokenFloats = new();
         private static string spokenFloatsScene = "";
 
@@ -171,8 +172,10 @@ namespace AccessibilityMod.Patches
                 sources.Clear();
                 spokenFloatsScene = scene;
             }
-            if (spokenFloats.TryGetValue(key, out float firstSpoken)
-                && currentTime - firstSpoken < REPEAT_SUPPRESSION_SECONDS)
+            float repeatWindow = AccessibilityPreferences.GetRepeatSuppressionSeconds();
+            if (repeatWindow > 0f
+                && spokenFloats.TryGetValue(key, out float firstSpoken)
+                && currentTime - firstSpoken < repeatWindow)
             {
                 if (AccessibilityPreferences.GetDebugMode())
                     MelonLogger.Msg($"[ORB] suppressed via {prefix} t={currentTime:F2} key=<{key}>");

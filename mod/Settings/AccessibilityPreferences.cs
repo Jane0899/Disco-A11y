@@ -18,6 +18,7 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Entry<bool> debugModeEntry;
         private static MelonPreferences_Entry<bool> itemDescriptionsEntry;
         private static MelonPreferences_Entry<string> seenAreaIntrosEntry;
+        private static MelonPreferences_Entry<int> repeatSuppressionMinutesEntry;
 
         public static void Initialize()
         {
@@ -40,6 +41,15 @@ namespace AccessibilityMod.Settings
             category.CreateEntry<int>("OrbVolume", 80, "Volume of the separate orb-text voice, 0-100 (read by the TTS server)");
             category.CreateEntry<string>("OrbVoice", "", "Windows voice display name for orb text; empty = system default (read by the TTS server)");
             category.CreateEntry<int>("OrbRate", 100, "Speaking rate of the orb voice in percent, 100 = normal (read by the TTS server)");
+
+            // One window governs two kinds of repetition: an ambient orb line that keeps
+            // looping (the hostel radio's weather reports), and an area description replayed
+            // because the player walked a door back and forth while searching a room. Both
+            // ask the same question - "did I already say this in the last few minutes?" - so
+            // they share one player-facing number. 0 = never suppress; default 3 minutes
+            // matches the value the orb suppression used before it was made configurable.
+            repeatSuppressionMinutesEntry = category.CreateEntry<int>("RepeatSuppressionMinutes", 3,
+                "Minutes before a repeated orb line or a re-entered area description may play again (0 = never suppress)");
 
             speechInterruptEntry = category.CreateEntry<bool>("SpeechInterrupt", false,
                 "Enable global speech interrupt");
@@ -140,6 +150,17 @@ namespace AccessibilityMod.Settings
                 ? sceneName
                 : seenAreaIntrosEntry.Value + "," + sceneName;
             category.SaveToFile();
+        }
+
+        /// <summary>
+        /// The shared repeat-suppression window in seconds (0 = never suppress). Governs both
+        /// looping orb lines and re-entered area descriptions, so there is one dial for the
+        /// player, set in minutes in the configurator.
+        /// </summary>
+        public static float GetRepeatSuppressionSeconds()
+        {
+            int minutes = repeatSuppressionMinutesEntry.Value;
+            return minutes <= 0 ? 0f : minutes * 60f;
         }
 
         public static bool GetItemDescriptions()

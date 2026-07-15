@@ -19,6 +19,11 @@ public sealed class ModConfig
 
     /// <summary>Windows voice display name for orb text; empty = system default. Read by the TTS server.</summary>
     public string OrbVoice { get; set; } = "";
+    /// <summary>
+    /// Minutes before a repeated orb line or a re-entered area description may play again.
+    /// 0 = never suppress. Shared by the orb throttle and the area-description throttle.
+    /// </summary>
+    public int RepeatSuppressionMinutes { get; set; } = 3;
     public bool SpeechInterrupt { get; set; } = false;
     public bool SpeakAudioCaptions { get; set; } = true;
     public bool DialogAutoAdvance { get; set; } = false;
@@ -162,6 +167,9 @@ public sealed class ModConfig
                 case "OrbVoice":
                     config.OrbVoice = Unquote(value);
                     break;
+                case "RepeatSuppressionMinutes":
+                    if (int.TryParse(value, out var mins)) config.RepeatSuppressionMinutes = Math.Max(0, Math.Min(60, mins));
+                    break;
                 case "SpeechInterrupt":
                     config.SpeechInterrupt = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
@@ -211,6 +219,7 @@ public sealed class ModConfig
         sb.AppendLine($"OrbAnnouncements = {(OrbAnnouncements ? "true" : "false")}");
         sb.AppendLine($"OrbVolume = {OrbVolume}");
         sb.AppendLine($"OrbVoice = \"{OrbVoice}\"");
+        sb.AppendLine($"RepeatSuppressionMinutes = {RepeatSuppressionMinutes}");
         sb.AppendLine($"SpeechInterrupt = {(SpeechInterrupt ? "true" : "false")}");
         sb.AppendLine($"SpeakAudioCaptions = {(SpeakAudioCaptions ? "true" : "false")}");
         sb.AppendLine($"DialogAutoAdvance = {(DialogAutoAdvance ? "true" : "false")}");

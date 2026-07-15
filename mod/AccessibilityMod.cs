@@ -107,9 +107,14 @@ namespace AccessibilityMod
             pendingIntroScene = null;
             if (intro == null) return;
 
-            TolkScreenReader.Instance.Speak(intro, false, AnnouncementCategory.Queueable);
+            SpeakDescriptionOnServerOrTolk(intro, interruptOnFallback: false);
             AccessibilityPreferences.MarkAreaIntroSeen(scene);
         }
+
+        // How long each area's description has to wait before it plays again on entering. Not
+        // cleared on scene change - the whole point is to remember a room you leave and come
+        // back to. See SpeakAreaDescription.
+        private static readonly System.Collections.Generic.Dictionary<string, float> areaDescriptionLastSpoken = new();
 
         /// <summary>
         /// What the area looks like - the thing a sighted player takes in the moment the
@@ -132,7 +137,24 @@ namespace AccessibilityMod
                 return;
             }
 
-            TolkScreenReader.Instance.Speak(description, onDemand, AnnouncementCategory.Queueable);
+            // On entering an area, a description that already played in the last few minutes
+            // stays quiet: walking a door back and forth while searching a room should not
+            // replay the whole description each time. The window is the shared repeat-
+            // suppression setting, the same one that throttles looping orb lines. Asking for
+            // the description by key always speaks - an explicit request is never suppressed.
+            if (!onDemand)
+            {
+                float window = AccessibilityPreferences.GetRepeatSuppressionSeconds();
+                if (window > 0f
+                    && areaDescriptionLastSpoken.TryGetValue(scene, out float last)
+                    && Time.time - last < window)
+                {
+                    return;
+                }
+                areaDescriptionLastSpoken[scene] = Time.time;
+            }
+
+            SpeakDescriptionOnServerOrTolk(description, interruptOnFallback: onDemand);
         }
 
         /// <summary>The long introduction, on demand - the "where am I, actually?" key.</summary>
@@ -149,7 +171,28 @@ namespace AccessibilityMod
                 return;
             }
 
-            TolkScreenReader.Instance.Speak(intro, true, AnnouncementCategory.Queueable);
+            SpeakDescriptionOnServerOrTolk(intro, interruptOnFallback: true);
+        }
+
+        /// <summary>
+        /// Area descriptions and introductions play on the orb voice through the external TTS
+        /// server, the same channel as orb text and for the same reason: they are long and
+        /// atmospheric, and on the one screen-reader channel every navigation keypress cut them
+        /// off before the end. The server's voice runs in parallel with NVDA. The mod stays dumb
+        /// here too - it hands over the text with no speaker and nothing else. Only if the server
+        /// cannot be started does it fall back to the screen reader, so a description is never
+        /// lost; still recorded as heard either way so the speech log stays complete.
+        /// </summary>
+        private static void SpeakDescriptionOnServerOrTolk(string text, bool interruptOnFallback)
+        {
+            if (OrbSpeech.Speak(null, text))
+            {
+                TolkScreenReader.Instance.RecordExternalSpeech(text);
+            }
+            else
+            {
+                TolkScreenReader.Instance.Speak(text, interruptOnFallback, AnnouncementCategory.Queueable);
+            }
         }
 
         public override void OnInitializeMelon()

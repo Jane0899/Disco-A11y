@@ -27,6 +27,8 @@ public sealed class MainForm : Form
     private readonly Label orbVolumeValueLabel;
     private readonly Label orbVoiceLabel;
     private readonly ComboBox orbVoiceCombo;
+    private readonly Label repeatSuppressionLabel;
+    private readonly NumericUpDown repeatSuppressionInput;
     private readonly CheckBox speechInterruptCheck;
     private readonly CheckBox speakAudioCaptionsCheck;
     private readonly CheckBox dialogAutoAdvanceCheck;
@@ -45,7 +47,7 @@ public sealed class MainForm : Form
     public MainForm(string? initialGamePath = null)
     {
         Width = 720;
-        Height = 937;
+        Height = 965;
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
 
@@ -94,7 +96,7 @@ public sealed class MainForm : Form
         stardewPresetButton = new Button { Left = 463, Top = 470, Width = 232 };
         stardewPresetButton.Click += (_, _) => ApplyPreset(Preset.Stardew);
 
-        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 232 };
+        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 260 };
         dialogModeLabel = new Label { Left = 12, Top = 28, Width = 130 };
         dialogModeCombo = new ComboBox { Left = 150, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
         // Orb text and its volume sit together: the volume is only about the separate orb voice.
@@ -117,19 +119,24 @@ public sealed class MainForm : Form
         dialogAutoAdvanceCheck = new CheckBox { Left = 12, Top = 160, Width = 400 };
         autoInteractCheck = new CheckBox { Left = 420, Top = 160, Width = 250 };
         itemDescriptionsCheck = new CheckBox { Left = 12, Top = 192, Width = 660 };
-        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, orbVolumeLabel, orbVolumeTrack, orbVolumeValueLabel, orbVoiceLabel, orbVoiceCombo, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck, itemDescriptionsCheck });
+        // The shared repeat-suppression window, in minutes: how long before a looping orb line
+        // or a re-entered area description may play again. A spin box, not a slider - a screen
+        // reader announces the exact number as you arrow, and the value is a plain count.
+        repeatSuppressionLabel = new Label { Left = 12, Top = 226, Width = 340 };
+        repeatSuppressionInput = new NumericUpDown { Left = 360, Top = 222, Width = 70, Minimum = 0, Maximum = 60 };
+        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, orbVolumeLabel, orbVolumeTrack, orbVolumeValueLabel, orbVoiceLabel, orbVoiceCombo, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck, itemDescriptionsCheck, repeatSuppressionLabel, repeatSuppressionInput });
 
         // Everything diagnostic lives under one roof, so it is obvious what is a play
         // setting and what is a "I am working on the mod" setting.
-        debugGroup = new GroupBox { Left = 12, Top = 752, Width = 683, Height = 90 };
+        debugGroup = new GroupBox { Left = 12, Top = 780, Width = 683, Height = 90 };
         debugModeCheck = new CheckBox { Left = 12, Top = 24, Width = 660 };
         speechLogCheck = new CheckBox { Left = 12, Top = 54, Width = 660 };
         debugGroup.Controls.AddRange(new Control[] { debugModeCheck, speechLogCheck });
 
-        saveButton = new Button { Left = 12, Top = 852, Width = 150 };
+        saveButton = new Button { Left = 12, Top = 880, Width = 150 };
         saveButton.Click += SaveButton_Click;
 
-        statusLabel = new Label { Left = 170, Top = 857, Width = 525, Text = "" };
+        statusLabel = new Label { Left = 170, Top = 885, Width = 525, Text = "" };
 
         Controls.AddRange(new Control[]
         {
@@ -190,6 +197,8 @@ public sealed class MainForm : Form
         orbVolumeTrack.AccessibleName = Strings.Get("OrbVolume") + " " + orbVolumeTrack.Value + " %";
         orbVoiceLabel.Text = Strings.Get("OrbVoiceLabel");
         orbVoiceCombo.AccessibleName = Strings.Get("OrbVoiceLabel");
+        repeatSuppressionLabel.Text = Strings.Get("RepeatSuppressionLabel");
+        repeatSuppressionInput.AccessibleName = Strings.Get("RepeatSuppressionLabel");
         speechInterruptCheck.Text = Strings.Get("SpeechInterrupt");
         speechInterruptCheck.AccessibleName = Strings.Get("SpeechInterrupt");
         speakAudioCaptionsCheck.Text = Strings.Get("SpeakAudioCaptions");
@@ -237,6 +246,7 @@ public sealed class MainForm : Form
         orbVolumeTrack.Value = Math.Max(0, Math.Min(100, config.OrbVolume));
         orbVolumeValueLabel.Text = orbVolumeTrack.Value + " %";
         PopulateVoices(config.OrbVoice);
+        repeatSuppressionInput.Value = Math.Clamp(config.RepeatSuppressionMinutes, (int)repeatSuppressionInput.Minimum, (int)repeatSuppressionInput.Maximum);
         speechInterruptCheck.Checked = config.SpeechInterrupt;
         speakAudioCaptionsCheck.Checked = config.SpeakAudioCaptions;
         dialogAutoAdvanceCheck.Checked = config.DialogAutoAdvance;
@@ -459,6 +469,7 @@ public sealed class MainForm : Form
         config.OrbVolume = orbVolumeTrack.Value;
         // Index 0 is "(System default)" -> empty, which the server reads as the default voice.
         config.OrbVoice = orbVoiceCombo.SelectedIndex <= 0 ? "" : (orbVoiceCombo.SelectedItem?.ToString() ?? "");
+        config.RepeatSuppressionMinutes = (int)repeatSuppressionInput.Value;
         config.SpeechInterrupt = speechInterruptCheck.Checked;
         config.SpeakAudioCaptions = speakAudioCaptionsCheck.Checked;
         config.DialogAutoAdvance = dialogAutoAdvanceCheck.Checked;

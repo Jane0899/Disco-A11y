@@ -41,6 +41,7 @@ public static class Strings
         ["OrbVolume"] = ("Orb text volume", "Orb-Text-Lautstärke"),
         ["OrbVoiceLabel"] = ("Orb voice:", "Orb-Stimme:"),
         ["OrbVoiceSystemDefault"] = ("(System default)", "(Systemstandard)"),
+        ["RepeatSuppressionLabel"] = ("Don't repeat orbs/descriptions within (minutes, 0 = off):", "Orbs/Beschreibungen nicht wiederholen innerhalb (Minuten, 0 = aus):"),
         ["SpeechInterrupt"] = ("Speech interrupt on", "Sprachunterbrechung aktiv"),
         ["SpeakAudioCaptions"] = ("Speak sound captions", "Geräusch-Untertitel vorlesen"),
         ["DialogAutoAdvance"] = ("Auto-advance dialog after reading (autoread)", "Dialog nach dem Vorlesen automatisch weiterschalten (Autoread)"),
