@@ -43,8 +43,8 @@ public static class Strings
             "The downloaded release package does not contain the mod (Mods/AccessibilityMod.dll). Nothing was installed.",
             "Das heruntergeladene Release-Paket enthält die Mod nicht (Mods/AccessibilityMod.dll). Es wurde nichts installiert."),
         ["StandaloneRetired"] = (
-            "Note: the self-contained setup has been retired. The new version needs the .NET 10 Desktop Runtime, which you install once from https://dotnet.microsoft.com/download/dotnet/10.0 (Desktop Runtime, x64).",
-            "Hinweis: Das Setup mit eingebauter Laufzeit gibt es nicht mehr. Die neue Version braucht die .NET-10-Desktop-Runtime — die installierst du einmalig von https://dotnet.microsoft.com/download/dotnet/10.0 (Desktop Runtime, x64)."),
+            "Note: the self-contained setup has been retired. The new version needs the .NET 6 Desktop Runtime, which you install once from https://dotnet.microsoft.com/download/dotnet/6.0 (Desktop Runtime, x64).",
+            "Hinweis: Das Setup mit eingebauter Laufzeit gibt es nicht mehr. Die neue Version braucht die .NET-6-Desktop-Runtime — die installierst du einmalig von https://dotnet.microsoft.com/download/dotnet/6.0 (Desktop Runtime, x64)."),
         ["LogAccessible"] = ("Installation log", "Installationsprotokoll"),
 
         ["StatusGamePathMissing"] = ("Game folder not found. Please use 'Browse...' to select it.", "Spielordner nicht gefunden. Bitte über 'Durchsuchen...' auswählen."),
@@ -96,7 +96,7 @@ public static class Strings
             "The installer was updated to the latest version. Please start it again - it is ready to use.",
             "Der Installer wurde auf die neueste Version aktualisiert. Bitte starte ihn einfach erneut - er ist einsatzbereit."),
 
-        ["DotNetMissingPrompt"] = ("The mod needs the .NET 6 runtime, which is not installed. Download and install it now (about 30 MB, official Microsoft installer)?", "Der Mod benötigt die .NET-6-Laufzeitumgebung, die nicht installiert ist. Jetzt herunterladen und installieren (ca. 30 MB, offizieller Microsoft-Installer)?"),
+        ["DotNetMissingPrompt"] = ("The mod and its tools need the .NET 6 Desktop Runtime, which is not installed. Download and install it now (about 55 MB, official Microsoft installer)?", "Der Mod und seine Werkzeuge benötigen die .NET-6-Desktop-Runtime, die nicht installiert ist. Jetzt herunterladen und installieren (ca. 55 MB, offizieller Microsoft-Installer)?"),
         ["DotNetDownloading"] = ("Downloading .NET 6 runtime...", "Lade .NET-6-Laufzeitumgebung herunter..."),
         ["DotNetInstalling"] = ("Installing .NET 6 runtime (a Windows permission prompt may appear)...", "Installiere .NET-6-Laufzeitumgebung (es kann eine Windows-Berechtigungsabfrage erscheinen)..."),
         ["DotNetInstalled"] = (".NET 6 runtime installed.", ".NET-6-Laufzeitumgebung installiert."),

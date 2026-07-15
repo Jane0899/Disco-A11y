@@ -43,7 +43,7 @@ cp "$DISCO_ELYSIUM_PATH/nvdaControllerClient64.dll" "$STAGING_DIR/"
 
 # The mod debugger is part of the mod (Ctrl+Y, debug mode only), so it ships in the mod's
 # own zip and installs with it - not through a channel of its own.
-DEBUGGER="$REPO_DIR/tools/ModDebugger/bin/Release/net10.0-windows/win-x64/publish/DiscoElysiumModDebugger.exe"
+DEBUGGER="$REPO_DIR/tools/ModDebugger/bin/Release/net6.0-windows/win-x64/publish/DiscoElysiumModDebugger.exe"
 if [ -f "$DEBUGGER" ]; then
     cp "$DEBUGGER" "$STAGING_DIR/"
 else
@@ -54,7 +54,7 @@ fi
 # The orb TTS server (tools/TtsServer) is core mod functionality - it speaks the orb text
 # whenever the mod runs - so it ships in the mod zip too, in its own folder under Mods (it
 # carries several DLLs of its own, so it is a folder rather than a lone exe). Framework-
-# dependent like the other tools: the player installs the .NET 10 Desktop Runtime once.
+# dependent like the other tools: the player installs the .NET 6 Desktop Runtime once.
 echo "Publishing TTS server..."
 dotnet publish "$REPO_DIR/tools/TtsServer/TtsServer.csproj" -c Release --self-contained false \
     -o "$STAGING_DIR/Mods/TtsServer" >/dev/null

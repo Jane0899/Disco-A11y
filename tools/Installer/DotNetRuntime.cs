@@ -3,13 +3,16 @@ using System.Diagnostics;
 namespace Installer;
 
 /// <summary>
-/// MelonLoader hosts the mod on the system-wide .NET 6 runtime - without it the game
-/// fails on first modded launch with a cryptic error. The installer checks for it and
-/// can download and silently run Microsoft's official runtime installer.
+/// One runtime covers everything the mod ships. MelonLoader hosts the mod on the system-wide
+/// .NET 6 base runtime; our own WinForms tools (installer, configurator, debugger) need the
+/// .NET 6 *Desktop* runtime, and the orb TTS server is net6 too. The Desktop runtime is a
+/// superset of the base runtime, so installing it once satisfies all three - which is why the
+/// check and the download both target the Desktop runtime, not the plain base runtime. Without
+/// it the modded game fails on first launch with a cryptic error and the tools do not start.
 /// </summary>
 public static class DotNetRuntime
 {
-    private const string DownloadUrl = "https://aka.ms/dotnet/6.0/dotnet-runtime-win-x64.exe";
+    private const string DownloadUrl = "https://aka.ms/dotnet/6.0/windowsdesktop-runtime-win-x64.exe";
 
     public static bool IsModRuntimePresent()
     {
@@ -19,7 +22,10 @@ public static class DotNetRuntime
                      Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
                  })
         {
-            var shared = Path.Combine(root, "dotnet", "shared", "Microsoft.NETCore.App");
+            // The Desktop runtime is the gate: it implies the base runtime the mod needs, and
+            // it is what the WinForms tools require. A machine with only the base runtime (mod
+            // works, tools do not) correctly reads as "missing" and gets the Desktop runtime.
+            var shared = Path.Combine(root, "dotnet", "shared", "Microsoft.WindowsDesktop.App");
             if (Directory.Exists(shared) && Directory.GetDirectories(shared, "6.*").Length > 0)
             {
                 return true;
@@ -30,7 +36,7 @@ public static class DotNetRuntime
 
     public static async Task<bool> InstallAsync(Action<string> log)
     {
-        var temp = Path.Combine(Path.GetTempPath(), "dotnet-runtime-6-win-x64.exe");
+        var temp = Path.Combine(Path.GetTempPath(), "windowsdesktop-runtime-6-win-x64.exe");
 
         log(Strings.Get("DotNetDownloading"));
         using (var http = new HttpClient())

@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- The server runs as its own process, independent of the mod, so it is NOT tied to the
-         game's .NET 6 runtime - and net6 is end-of-life. It targets net10 (current LTS, and
-         what the tools use) plus the Windows 10 projection, so it can call
+    <!-- Targets net6 plus the Windows 10 projection, so it can call
          Windows.Media.SpeechSynthesis - the only way to reach the modern OneCore and
-         natural/neural voices (classic SAPI cannot render them). -->
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+         natural/neural voices (classic SAPI cannot render them). net6 matches everything
+         else the mod ships: the mod is pinned to net6 by MelonLoader anyway, so keeping the
+         tools and this server on net6 means the machine needs exactly one runtime (the .NET 6
+         Desktop Runtime) rather than two. WinRT projection works fine on net6.0-windows10.x. -->
+    <TargetFramework>net6.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <AssemblyName>DiscoElysiumTtsServer</AssemblyName>
