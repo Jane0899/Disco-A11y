@@ -39,6 +39,8 @@ public static class Strings
         ["DialogModeSpeakerOnly"] = ("Speaker name only", "Nur Sprechername"),
         ["OrbAnnouncements"] = ("Orb announcements on", "Orb-Ansagen aktiv"),
         ["OrbVolume"] = ("Orb text volume", "Orb-Text-Lautstärke"),
+        ["OrbVoiceLabel"] = ("Orb voice:", "Orb-Stimme:"),
+        ["OrbVoiceSystemDefault"] = ("(System default)", "(Systemstandard)"),
         ["SpeechInterrupt"] = ("Speech interrupt on", "Sprachunterbrechung aktiv"),
         ["SpeakAudioCaptions"] = ("Speak sound captions", "Geräusch-Untertitel vorlesen"),
         ["DialogAutoAdvance"] = ("Auto-advance dialog after reading (autoread)", "Dialog nach dem Vorlesen automatisch weiterschalten (Autoread)"),

@@ -204,15 +204,17 @@ namespace AccessibilityMod.Patches
 
             string announcement = speaker != null ? $"{speaker}: {trimmedText}" : $"{prefix}: {trimmedText}";
 
-            // Orb text goes to the separate SAPI voice, not the screen reader: on the screen
-            // reader it was drowned out - every keypress and navigation announcement interrupts
-            // the line before it, and an atmospheric bubble never survived to the end. The SAPI
-            // voice plays in parallel with NVDA instead of competing for the one channel. Lines
-            // queue on it (no interrupt) so two speakers close together are both heard. Only if
-            // SAPI is somehow unavailable does it fall back to the screen reader.
-            if (SapiVoice.Speak(announcement))
+            // Orb text goes to the external TTS server's own voice, not the screen reader: on the
+            // screen reader it was drowned out - every keypress and navigation announcement
+            // interrupts the line before it, and an atmospheric bubble never survived to the end.
+            // The server's voice plays in parallel with NVDA instead of competing for the one
+            // channel, and queues lines so two speakers close together are both heard. The mod
+            // stays dumb: it hands over (speaker, text) and nothing else. Only if the server
+            // cannot be started at all does it fall back to the screen reader, so a line is never
+            // simply lost.
+            if (OrbSpeech.Speak(speaker, announcement))
             {
-                // Spoken on the SAPI voice, but still recorded as heard so the speech log and
+                // Spoken on the server's voice, but still recorded as heard so the speech log and
                 // the debugger transcript stay complete.
                 TolkScreenReader.Instance.RecordExternalSpeech(announcement);
             }

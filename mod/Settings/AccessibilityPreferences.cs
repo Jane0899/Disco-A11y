@@ -8,7 +8,6 @@ namespace AccessibilityMod.Settings
         private static MelonPreferences_Category category;
         private static MelonPreferences_Entry<int> dialogModeEntry;
         private static MelonPreferences_Entry<bool> orbAnnouncementsEntry;
-        private static MelonPreferences_Entry<int> orbVolumeEntry;
         private static MelonPreferences_Entry<bool> speechInterruptEntry;
         private static MelonPreferences_Entry<bool> speakAudioCaptionsEntry;
         private static MelonPreferences_Entry<bool> dialogAutoAdvanceEntry;
@@ -31,12 +30,16 @@ namespace AccessibilityMod.Settings
             orbAnnouncementsEntry = category.CreateEntry<bool>("OrbAnnouncements", true,
                 "Enable orb text announcements");
 
-            // Orb text plays on its own SAPI voice (see mod/SapiVoice.cs); this is that
-            // voice's volume, 0-100. The screen reader has its own volume control and is
-            // untouched by this - the point of the separate voice is that the two are
-            // independent, so the ambient orb chatter can sit quietly under the reader.
-            orbVolumeEntry = category.CreateEntry<int>("OrbVolume", 80,
-                "Volume of the separate orb-text voice, 0-100");
+            // Orb text plays on its own voice through the external TTS server (tools/TtsServer,
+            // driven by mod/OrbSpeech.cs), which reads voice, volume and rate straight from this
+            // file. The mod never reads them - it only hands the server (speaker, text). These
+            // three keys are still registered here, without accessors, purely so the mod's own
+            // config saves keep them in the file (an unregistered key under this category would
+            // be dropped on the next SaveToFile) and so the settings are documented in one place.
+            // The screen reader has its own volume and is untouched by any of this.
+            category.CreateEntry<int>("OrbVolume", 80, "Volume of the separate orb-text voice, 0-100 (read by the TTS server)");
+            category.CreateEntry<string>("OrbVoice", "", "Windows voice display name for orb text; empty = system default (read by the TTS server)");
+            category.CreateEntry<int>("OrbRate", 100, "Speaking rate of the orb voice in percent, 100 = normal (read by the TTS server)");
 
             speechInterruptEntry = category.CreateEntry<bool>("SpeechInterrupt", false,
                 "Enable global speech interrupt");
@@ -95,18 +98,6 @@ namespace AccessibilityMod.Settings
         public static void SetOrbAnnouncements(bool enabled)
         {
             orbAnnouncementsEntry.Value = enabled;
-            category.SaveToFile();
-        }
-
-        /// <summary>Volume of the separate orb-text voice, clamped to 0-100.</summary>
-        public static int GetOrbVolume()
-        {
-            return System.Math.Max(0, System.Math.Min(100, orbVolumeEntry.Value));
-        }
-
-        public static void SetOrbVolume(int volume)
-        {
-            orbVolumeEntry.Value = System.Math.Max(0, System.Math.Min(100, volume));
             category.SaveToFile();
         }
 

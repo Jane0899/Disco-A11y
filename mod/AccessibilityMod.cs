@@ -233,6 +233,11 @@ namespace AccessibilityMod
         {
             navigationSystem?.WaypointManager.SaveAllWaypoints();
 
+            // Close the pipe to the orb TTS server so it exits with the game rather than
+            // outliving it. (It would exit on the pipe's EOF anyway when our process ends; this
+            // just makes it prompt and clean.)
+            OrbSpeech.Shutdown();
+
             // Clean up Tolk when the game exits
             TolkScreenReader.Instance.Cleanup();
             LoggerInstance.Msg("Tolk cleaned up");

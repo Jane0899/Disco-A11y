@@ -273,6 +273,17 @@ public static class ModInstaller
         CopyFile(Path.Combine(extractedRoot, "DiscoElysiumModDebugger.exe"),
                  Path.Combine(gamePath, "DiscoElysiumModDebugger.exe"), statusCallback);
 
+        // The orb TTS server (tools/TtsServer) is core mod functionality - it speaks the orb
+        // text whenever the mod runs - so it travels in the mod zip too, as its own folder
+        // under Mods (it carries several DLLs of its own, so it is a folder, not a lone exe).
+        // Copy the whole folder, replacing an older server wholesale.
+        var ttsSource = Path.Combine(extractedRoot, "Mods", "TtsServer");
+        if (Directory.Exists(ttsSource))
+        {
+            statusCallback?.Invoke(Strings.Get("StepCopying", "TtsServer"));
+            CopyDirectory(ttsSource, Path.Combine(modsPath, "TtsServer"), overwrite: true);
+        }
+
         var userDataSource = Path.Combine(extractedRoot, "UserData");
         if (Directory.Exists(userDataSource))
         {

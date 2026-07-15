@@ -16,6 +16,9 @@ public sealed class ModConfig
     public int DialogReadingMode { get; set; } // 0 = Disabled, 1 = Full, 2 = SpeakerOnly
     public bool OrbAnnouncements { get; set; } = true;
     public int OrbVolume { get; set; } = 80;
+
+    /// <summary>Windows voice display name for orb text; empty = system default. Read by the TTS server.</summary>
+    public string OrbVoice { get; set; } = "";
     public bool SpeechInterrupt { get; set; } = false;
     public bool SpeakAudioCaptions { get; set; } = true;
     public bool DialogAutoAdvance { get; set; } = false;
@@ -156,6 +159,9 @@ public sealed class ModConfig
                 case "OrbVolume":
                     if (int.TryParse(value, out var vol)) config.OrbVolume = Math.Max(0, Math.Min(100, vol));
                     break;
+                case "OrbVoice":
+                    config.OrbVoice = Unquote(value);
+                    break;
                 case "SpeechInterrupt":
                     config.SpeechInterrupt = value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
@@ -204,6 +210,7 @@ public sealed class ModConfig
         sb.AppendLine($"DialogReadingMode = {DialogReadingMode}");
         sb.AppendLine($"OrbAnnouncements = {(OrbAnnouncements ? "true" : "false")}");
         sb.AppendLine($"OrbVolume = {OrbVolume}");
+        sb.AppendLine($"OrbVoice = \"{OrbVoice}\"");
         sb.AppendLine($"SpeechInterrupt = {(SpeechInterrupt ? "true" : "false")}");
         sb.AppendLine($"SpeakAudioCaptions = {(SpeakAudioCaptions ? "true" : "false")}");
         sb.AppendLine($"DialogAutoAdvance = {(DialogAutoAdvance ? "true" : "false")}");

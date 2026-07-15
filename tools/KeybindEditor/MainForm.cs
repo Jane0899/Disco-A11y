@@ -25,6 +25,8 @@ public sealed class MainForm : Form
     private readonly Label orbVolumeLabel;
     private readonly TrackBar orbVolumeTrack;
     private readonly Label orbVolumeValueLabel;
+    private readonly Label orbVoiceLabel;
+    private readonly ComboBox orbVoiceCombo;
     private readonly CheckBox speechInterruptCheck;
     private readonly CheckBox speakAudioCaptionsCheck;
     private readonly CheckBox dialogAutoAdvanceCheck;
@@ -43,7 +45,7 @@ public sealed class MainForm : Form
     public MainForm(string? initialGamePath = null)
     {
         Width = 720;
-        Height = 905;
+        Height = 937;
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
 
@@ -92,7 +94,7 @@ public sealed class MainForm : Form
         stardewPresetButton = new Button { Left = 463, Top = 470, Width = 232 };
         stardewPresetButton.Click += (_, _) => ApplyPreset(Preset.Stardew);
 
-        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 200 };
+        generalGroup = new GroupBox { Left = 12, Top = 510, Width = 683, Height = 232 };
         dialogModeLabel = new Label { Left = 12, Top = 28, Width = 130 };
         dialogModeCombo = new ComboBox { Left = 150, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
         // Orb text and its volume sit together: the volume is only about the separate orb voice.
@@ -105,24 +107,29 @@ public sealed class MainForm : Form
             orbVolumeValueLabel.Text = orbVolumeTrack.Value + " %";
             orbVolumeTrack.AccessibleName = Strings.Get("OrbVolume") + " " + orbVolumeTrack.Value + " %";
         };
-        speechInterruptCheck = new CheckBox { Left = 12, Top = 96, Width = 220 };
-        speakAudioCaptionsCheck = new CheckBox { Left = 250, Top = 96, Width = 230 };
-        dialogAutoAdvanceCheck = new CheckBox { Left = 12, Top = 128, Width = 400 };
-        autoInteractCheck = new CheckBox { Left = 420, Top = 128, Width = 250 };
-        itemDescriptionsCheck = new CheckBox { Left = 12, Top = 160, Width = 660 };
-        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, orbVolumeLabel, orbVolumeTrack, orbVolumeValueLabel, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck, itemDescriptionsCheck });
+        // The voice for the orb text sits with the rest of the orb settings. Its entries come
+        // from the TTS server, filled in on load once the game folder (and thus the server) is
+        // known - see PopulateVoices.
+        orbVoiceLabel = new Label { Left = 12, Top = 94, Width = 90 };
+        orbVoiceCombo = new ComboBox { Left = 105, Top = 90, Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
+        speechInterruptCheck = new CheckBox { Left = 12, Top = 128, Width = 220 };
+        speakAudioCaptionsCheck = new CheckBox { Left = 250, Top = 128, Width = 230 };
+        dialogAutoAdvanceCheck = new CheckBox { Left = 12, Top = 160, Width = 400 };
+        autoInteractCheck = new CheckBox { Left = 420, Top = 160, Width = 250 };
+        itemDescriptionsCheck = new CheckBox { Left = 12, Top = 192, Width = 660 };
+        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, orbVolumeLabel, orbVolumeTrack, orbVolumeValueLabel, orbVoiceLabel, orbVoiceCombo, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck, itemDescriptionsCheck });
 
         // Everything diagnostic lives under one roof, so it is obvious what is a play
         // setting and what is a "I am working on the mod" setting.
-        debugGroup = new GroupBox { Left = 12, Top = 720, Width = 683, Height = 90 };
+        debugGroup = new GroupBox { Left = 12, Top = 752, Width = 683, Height = 90 };
         debugModeCheck = new CheckBox { Left = 12, Top = 24, Width = 660 };
         speechLogCheck = new CheckBox { Left = 12, Top = 54, Width = 660 };
         debugGroup.Controls.AddRange(new Control[] { debugModeCheck, speechLogCheck });
 
-        saveButton = new Button { Left = 12, Top = 820, Width = 150 };
+        saveButton = new Button { Left = 12, Top = 852, Width = 150 };
         saveButton.Click += SaveButton_Click;
 
-        statusLabel = new Label { Left = 170, Top = 825, Width = 525, Text = "" };
+        statusLabel = new Label { Left = 170, Top = 857, Width = 525, Text = "" };
 
         Controls.AddRange(new Control[]
         {
@@ -181,6 +188,8 @@ public sealed class MainForm : Form
         orbAnnouncementsCheck.AccessibleName = Strings.Get("OrbAnnouncements");
         orbVolumeLabel.Text = Strings.Get("OrbVolume");
         orbVolumeTrack.AccessibleName = Strings.Get("OrbVolume") + " " + orbVolumeTrack.Value + " %";
+        orbVoiceLabel.Text = Strings.Get("OrbVoiceLabel");
+        orbVoiceCombo.AccessibleName = Strings.Get("OrbVoiceLabel");
         speechInterruptCheck.Text = Strings.Get("SpeechInterrupt");
         speechInterruptCheck.AccessibleName = Strings.Get("SpeechInterrupt");
         speakAudioCaptionsCheck.Text = Strings.Get("SpeakAudioCaptions");
@@ -227,6 +236,7 @@ public sealed class MainForm : Form
         orbAnnouncementsCheck.Checked = config.OrbAnnouncements;
         orbVolumeTrack.Value = Math.Max(0, Math.Min(100, config.OrbVolume));
         orbVolumeValueLabel.Text = orbVolumeTrack.Value + " %";
+        PopulateVoices(config.OrbVoice);
         speechInterruptCheck.Checked = config.SpeechInterrupt;
         speakAudioCaptionsCheck.Checked = config.SpeakAudioCaptions;
         dialogAutoAdvanceCheck.Checked = config.DialogAutoAdvance;
@@ -235,6 +245,37 @@ public sealed class MainForm : Form
         speechLogCheck.Checked = config.SpeechLog;
         debugModeCheck.Checked = config.DebugMode;
         SetStatus(File.Exists(ConfigPath) ? Strings.Get("StatusConfigLoaded") : Strings.Get("StatusConfigNotFound"));
+    }
+
+    /// <summary>
+    /// Fills the voice dropdown from the installed voices (fetched from the TTS server) and
+    /// selects the one from the config. The first entry is always "(System default)"; picking
+    /// it stores an empty OrbVoice, which the server reads as "use whatever Windows defaults
+    /// to". A voice saved on another machine but not installed here is added at the end so it
+    /// stays selected rather than being silently dropped.
+    /// </summary>
+    private void PopulateVoices(string selected)
+    {
+        orbVoiceCombo.Items.Clear();
+        orbVoiceCombo.Items.Add(Strings.Get("OrbVoiceSystemDefault"));
+        foreach (var name in InstalledVoices.ForGame(gamePathBox.Text.Trim()))
+        {
+            orbVoiceCombo.Items.Add(name);
+        }
+
+        if (string.IsNullOrEmpty(selected))
+        {
+            orbVoiceCombo.SelectedIndex = 0;
+            return;
+        }
+
+        int index = orbVoiceCombo.Items.IndexOf(selected);
+        if (index < 0)
+        {
+            orbVoiceCombo.Items.Add(selected);
+            index = orbVoiceCombo.Items.Count - 1;
+        }
+        orbVoiceCombo.SelectedIndex = index;
     }
 
     private void RefreshBindingsList()
@@ -416,6 +457,8 @@ public sealed class MainForm : Form
         config.DialogReadingMode = dialogModeCombo.SelectedIndex;
         config.OrbAnnouncements = orbAnnouncementsCheck.Checked;
         config.OrbVolume = orbVolumeTrack.Value;
+        // Index 0 is "(System default)" -> empty, which the server reads as the default voice.
+        config.OrbVoice = orbVoiceCombo.SelectedIndex <= 0 ? "" : (orbVoiceCombo.SelectedItem?.ToString() ?? "");
         config.SpeechInterrupt = speechInterruptCheck.Checked;
         config.SpeakAudioCaptions = speakAudioCaptionsCheck.Checked;
         config.DialogAutoAdvance = dialogAutoAdvanceCheck.Checked;

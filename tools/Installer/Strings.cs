@@ -43,8 +43,8 @@ public static class Strings
             "The downloaded release package does not contain the mod (Mods/AccessibilityMod.dll). Nothing was installed.",
             "Das heruntergeladene Release-Paket enthält die Mod nicht (Mods/AccessibilityMod.dll). Es wurde nichts installiert."),
         ["StandaloneRetired"] = (
-            "Note: the self-contained setup has been retired. The new version needs the .NET 8 Desktop Runtime, which you install once from https://dotnet.microsoft.com/download/dotnet/8.0 (Desktop Runtime, x64).",
-            "Hinweis: Das Setup mit eingebauter Laufzeit gibt es nicht mehr. Die neue Version braucht die .NET-8-Desktop-Runtime — die installierst du einmalig von https://dotnet.microsoft.com/download/dotnet/8.0 (Desktop Runtime, x64)."),
+            "Note: the self-contained setup has been retired. The new version needs the .NET 10 Desktop Runtime, which you install once from https://dotnet.microsoft.com/download/dotnet/10.0 (Desktop Runtime, x64).",
+            "Hinweis: Das Setup mit eingebauter Laufzeit gibt es nicht mehr. Die neue Version braucht die .NET-10-Desktop-Runtime — die installierst du einmalig von https://dotnet.microsoft.com/download/dotnet/10.0 (Desktop Runtime, x64)."),
         ["LogAccessible"] = ("Installation log", "Installationsprotokoll"),
 
         ["StatusGamePathMissing"] = ("Game folder not found. Please use 'Browse...' to select it.", "Spielordner nicht gefunden. Bitte über 'Durchsuchen...' auswählen."),

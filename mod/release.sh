@@ -43,13 +43,23 @@ cp "$DISCO_ELYSIUM_PATH/nvdaControllerClient64.dll" "$STAGING_DIR/"
 
 # The mod debugger is part of the mod (Ctrl+Y, debug mode only), so it ships in the mod's
 # own zip and installs with it - not through a channel of its own.
-DEBUGGER="$REPO_DIR/tools/ModDebugger/bin/Release/net8.0-windows/win-x64/publish/DiscoElysiumModDebugger.exe"
+DEBUGGER="$REPO_DIR/tools/ModDebugger/bin/Release/net10.0-windows/win-x64/publish/DiscoElysiumModDebugger.exe"
 if [ -f "$DEBUGGER" ]; then
     cp "$DEBUGGER" "$STAGING_DIR/"
 else
     echo "Warning: mod debugger not built - packaging without it."
     echo "  Build it with: dotnet publish tools/ModDebugger/ModDebugger.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true"
 fi
+
+# The orb TTS server (tools/TtsServer) is core mod functionality - it speaks the orb text
+# whenever the mod runs - so it ships in the mod zip too, in its own folder under Mods (it
+# carries several DLLs of its own, so it is a folder rather than a lone exe). Framework-
+# dependent like the other tools: the player installs the .NET 10 Desktop Runtime once.
+echo "Publishing TTS server..."
+dotnet publish "$REPO_DIR/tools/TtsServer/TtsServer.csproj" -c Release --self-contained false \
+    -o "$STAGING_DIR/Mods/TtsServer" >/dev/null
+# Publish drops a .pdb and the build's own config next to the exe; harmless, but trim the pdb.
+rm -f "$STAGING_DIR/Mods/TtsServer/"*.pdb
 
 # Copy data files
 if [ -d "$SCRIPT_DIR/Data" ]; then

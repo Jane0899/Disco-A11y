@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The server runs as its own process, independent of the mod, so it is NOT tied to the
+         game's .NET 6 runtime - and net6 is end-of-life. It targets net10 (current LTS, and
+         what the tools use) plus the Windows 10 projection, so it can call
+         Windows.Media.SpeechSynthesis - the only way to reach the modern OneCore and
+         natural/neural voices (classic SAPI cannot render them). -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>DiscoElysiumTtsServer</AssemblyName>
+    <RootNamespace>TtsServer</RootNamespace>
+    <!-- Windows-only by construction; the game and MelonLoader are Windows-only too. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+</Project>
