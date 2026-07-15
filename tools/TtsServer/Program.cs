@@ -36,6 +36,29 @@ internal static class Program
             return Render(outPath: args[1], text: args.Length >= 3 ? args[2] : "Test.");
         }
 
+        // --say <volume> <rate> <voice> <text>: play one line with these exact settings, ignoring
+        // the config file. The configurator's "test voice" button uses it to preview a voice the
+        // player has selected but not yet saved. Playback is the same as a real orb line - only
+        // the source of the settings differs (argv here, the cfg file there).
+        if (args.Length >= 1 && args[0] == "--say")
+        {
+            int sayVolume = args.Length >= 2 && int.TryParse(args[1], out var vv) ? vv : 80;
+            int sayRate = args.Length >= 3 && int.TryParse(args[2], out var rr) ? rr : 100;
+            string sayVoice = args.Length >= 4 ? args[3] : "";
+            string sayText = args.Length >= 5 ? args[4] : "Test.";
+            try
+            {
+                using var sayBackend = new WinRtTtsBackend();
+                sayBackend.SpeakDirect(sayVoice, sayVolume, sayRate, sayText);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("say failed: " + ex);
+                return 1;
+            }
+        }
+
         if (args.Length < 1)
         {
             Console.Error.WriteLine("usage: DiscoElysiumTtsServer <gamePath>   (reads JSON lines on stdin)");

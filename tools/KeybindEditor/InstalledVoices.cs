@@ -20,7 +20,7 @@ public static class InstalledVoices
     public static List<string> ForGame(string gamePath)
     {
         var voices = new List<string>();
-        var exe = FindExe(gamePath);
+        var exe = FindServerExe(gamePath);
         if (exe == null) return voices;
 
         try
@@ -59,7 +59,8 @@ public static class InstalledVoices
         return voices;
     }
 
-    private static string? FindExe(string gamePath)
+    /// <summary>Locates the TTS server exe under a game folder, or null if the mod is not installed there.</summary>
+    public static string? FindServerExe(string gamePath)
     {
         if (string.IsNullOrWhiteSpace(gamePath)) return null;
         string[] candidates =

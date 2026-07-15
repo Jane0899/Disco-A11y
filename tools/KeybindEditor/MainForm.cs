@@ -27,6 +27,7 @@ public sealed class MainForm : Form
     private readonly Label orbVolumeValueLabel;
     private readonly Label orbVoiceLabel;
     private readonly ComboBox orbVoiceCombo;
+    private readonly Button testVoiceButton;
     private readonly Label repeatSuppressionLabel;
     private readonly NumericUpDown repeatSuppressionInput;
     private readonly CheckBox speechInterruptCheck;
@@ -114,6 +115,10 @@ public sealed class MainForm : Form
         // known - see PopulateVoices.
         orbVoiceLabel = new Label { Left = 12, Top = 94, Width = 90 };
         orbVoiceCombo = new ComboBox { Left = 105, Top = 90, Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
+        // Hear the selected voice at the selected volume before committing - reuses the TTS
+        // server's normal playback with a throwaway config (see VoiceTester).
+        testVoiceButton = new Button { Left = 570, Top = 89, Width = 100 };
+        testVoiceButton.Click += TestVoiceButton_Click;
         speechInterruptCheck = new CheckBox { Left = 12, Top = 128, Width = 220 };
         speakAudioCaptionsCheck = new CheckBox { Left = 250, Top = 128, Width = 230 };
         dialogAutoAdvanceCheck = new CheckBox { Left = 12, Top = 160, Width = 400 };
@@ -124,7 +129,7 @@ public sealed class MainForm : Form
         // reader announces the exact number as you arrow, and the value is a plain count.
         repeatSuppressionLabel = new Label { Left = 12, Top = 226, Width = 340 };
         repeatSuppressionInput = new NumericUpDown { Left = 360, Top = 222, Width = 70, Minimum = 0, Maximum = 60 };
-        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, orbVolumeLabel, orbVolumeTrack, orbVolumeValueLabel, orbVoiceLabel, orbVoiceCombo, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck, itemDescriptionsCheck, repeatSuppressionLabel, repeatSuppressionInput });
+        generalGroup.Controls.AddRange(new Control[] { dialogModeLabel, dialogModeCombo, orbAnnouncementsCheck, orbVolumeLabel, orbVolumeTrack, orbVolumeValueLabel, orbVoiceLabel, orbVoiceCombo, testVoiceButton, speechInterruptCheck, speakAudioCaptionsCheck, dialogAutoAdvanceCheck, autoInteractCheck, itemDescriptionsCheck, repeatSuppressionLabel, repeatSuppressionInput });
 
         // Everything diagnostic lives under one roof, so it is obvious what is a play
         // setting and what is a "I am working on the mod" setting.
@@ -197,6 +202,8 @@ public sealed class MainForm : Form
         orbVolumeTrack.AccessibleName = Strings.Get("OrbVolume") + " " + orbVolumeTrack.Value + " %";
         orbVoiceLabel.Text = Strings.Get("OrbVoiceLabel");
         orbVoiceCombo.AccessibleName = Strings.Get("OrbVoiceLabel");
+        testVoiceButton.Text = Strings.Get("TestVoice");
+        testVoiceButton.AccessibleName = Strings.Get("TestVoice");
         repeatSuppressionLabel.Text = Strings.Get("RepeatSuppressionLabel");
         repeatSuppressionInput.AccessibleName = Strings.Get("RepeatSuppressionLabel");
         speechInterruptCheck.Text = Strings.Get("SpeechInterrupt");
@@ -491,6 +498,37 @@ public sealed class MainForm : Form
             SetStatus(message);
             MessageBox.Show(this, message, Strings.Get("SaveDialogTitle"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async void TestVoiceButton_Click(object? sender, EventArgs e)
+    {
+        var gamePath = gamePathBox.Text.Trim();
+        if (!Directory.Exists(gamePath))
+        {
+            SetStatus(Strings.Get("StatusGamePathMissing"));
+            return;
+        }
+
+        // Index 0 is "(System default)" -> empty voice, which the server reads as the default.
+        var voice = orbVoiceCombo.SelectedIndex <= 0 ? "" : (orbVoiceCombo.SelectedItem?.ToString() ?? "");
+        var volume = orbVolumeTrack.Value;
+
+        testVoiceButton.Enabled = false;
+        SetStatus(Strings.Get("StatusTestingVoice"));
+        try
+        {
+            // Rate is not exposed in the UI; preview at normal speed (100).
+            var ok = await VoiceTester.PlayAsync(gamePath, voice, volume, 100, Strings.Get("VoiceSample"));
+            if (!ok) SetStatus(Strings.Get("StatusTestVoiceUnavailable"));
+        }
+        catch (Exception ex)
+        {
+            SetStatus(Strings.Get("StatusTestVoiceError", ex.Message));
+        }
+        finally
+        {
+            testVoiceButton.Enabled = true;
         }
     }
 
