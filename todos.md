@@ -1,5 +1,11 @@
 # Disco-A11y — TODOs
 
+## Offene Bugs aus Janas Spielsession (16.07.2026, Quelle: „Fehler Disco.txt")
+
+- [ ] **#55 Inventar: Erhaltene Items nicht auffindbar** — Jana kann lange nicht alle Dinge sehen, die im Inventar liegen; z. B. erhaltene Medikamente und Handschuhe sind über die Inventar-Navigation nicht auffindbar. (Vermutung zu prüfen: Items landen auf einem Tab/einer Kategorie, die `InventoryNavigationHandler` nicht durchläuft, oder werden erst nach Scroll/Pagination sichtbar.)
+- [ ] **#56 Medikamente/Heilung: Plus-Symbol nicht erreichbar** — Das Spiel verlangt, bei einem Medikament auf das Plus-Symbol zu klicken, um Gesundheit aufzufüllen. Doppelt blockiert: das Medikament ist im Inventar nicht auffindbar (#55), und das Plus-Symbol (Heil-Button, vermutlich der HUD-Heilknopf) ist per Tastatur/Screenreader weder auffindbar noch klickbar.
+- [ ] **#57 Gedankenkabinett: Abschluss stumm, Navigation und Interaktion danach kaputt, nur Englisch** — Mehrere Teilprobleme: (a) „fast fertig gedacht" wird angesagt, das *Ergebnis* eines fertig gedachten Gedankens erscheint aber nur visuell und wird nicht vorgelesen; (b) danach kann Jana noch zu Objekten hinlaufen, aber nicht mehr mit ihnen interagieren (Ursache unklar — hängt evtl. ein unsichtbares UI/View offen?); (c) in der Gedanken-Anzeige lässt sich nicht vernünftig navigieren; (d) Gedanken werden auf Englisch vorgelesen statt in der deutschen Übersetzung.
+
 - **Disco Elysium (Disco-A11y) — Hotkey-Problem behoben, eigener Fork + Release + Editor-Tool gebaut**
   Ursprüngliche Einschätzung ("hängt hinterher") war ein Trugschluss auf Basis der reinen Spielerfahrung: Repo ist inhaltlich das reifste der drei Mods (90 Commits, Sept 2025 – April 2026, voller Funktionsumfang: Navigation, Dialog, Inventar, Journal, Thought Cabinet, Charakterbogen, Waypoints, Braille, RTL-Sprachen). Eigentliche Ursache war rein technisch: Hotkeys hartcodiert auf Unitys physische US-QWERTY-`KeyCode`s (`[`, `]`, `\`, `;`, `'`, `` ` ``) — auf deutschem QWERTZ-Layout an anderer Stelle bzw. nur über AltGr erreichbar (kollidiert mit Unitys Ctrl+Alt-Meldung für AltGr).
   Repo-Herkunft: `game-a11y/Disco-A11y` (kein eigenes Release je veröffentlicht — nur Sourcecode + lokales `release.sh`), Autor hat mit Claude Code gearbeitet (Commit-Trailer bestätigt).
