@@ -543,6 +543,27 @@ namespace AccessibilityMod.Inventory
         /// because its own OnSelect announcement is suppressed during a tab switch (see
         /// LastTabSwitchTime).
         /// </summary>
+        /// <summary>
+        /// Public entry for "where am I in the inventory?" - the current tab and how many
+        /// items it holds, "keine Objekte" when empty. Used by the on-demand announce key
+        /// as a non-interrupting fallback when no item is focused (bug #2).
+        /// </summary>
+        public static string DescribeCurrentTab()
+        {
+            try
+            {
+                var manager = Il2CppSunshine.InventoryManager.Singleton;
+                ItemTabGroup[] order = { ItemTabGroup.TOOLS, ItemTabGroup.CLOTHES, ItemTabGroup.PAWNABLES, ItemTabGroup.READING };
+                int idx = manager != null ? manager.CurrentTab : 0;
+                if (idx < 0 || idx >= order.Length) idx = 0;
+                return DescribeTab(order[idx]);
+            }
+            catch
+            {
+                return Settings.Loc.Get("InvNoItems");
+            }
+        }
+
         private static string DescribeTab(ItemTabGroup tab)
         {
             string name = Settings.Loc.Get("InvTab_" + tab);
@@ -572,7 +593,11 @@ namespace AccessibilityMod.Inventory
             }
             catch { /* count stays 0 - still announce the tab name */ }
 
-            string text = Settings.Loc.Get(count == 1 ? "InvTabWithCountOne" : "InvTabWithCount", name, count);
+            // "keine Objekte" for an empty tab (Danijel's option 2), a real count
+            // otherwise.
+            string text = count == 0
+                ? Settings.Loc.Get("InvTabEmpty", name)
+                : Settings.Loc.Get(count == 1 ? "InvTabWithCountOne" : "InvTabWithCount", name, count);
             if (!string.IsNullOrEmpty(firstItem))
             {
                 text += Settings.Loc.Get("InvTabFirstItem", firstItem);

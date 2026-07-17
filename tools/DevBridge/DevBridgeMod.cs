@@ -772,7 +772,7 @@ namespace DevBridge
                     // unattended sessions only. Hooking the game's input instead is not an
                     // option (see OnInitializeMelon). The mod's own hotkeys have a clean
                     // path and use "modkey".
-                    if (parts.Length < 2) return "usage: key <i|t|j|c|m|f1|escape|tab|...> (steals window focus)";
+                    if (parts.Length < 2) return "usage: key <i|ctrl+plus|ctrl+shift+tab|escape|...> (steals window focus)";
                     FocusGameWindow();
                     if (!TryPressKey(parts[1], out var error)) return error;
                     return $"pressed {parts[1]} (game window was focused)";
@@ -1218,6 +1218,12 @@ namespace DevBridge
             {
                 ["escape"] = 0x1B, ["tab"] = 0x09, ["space"] = 0x20, ["return"] = 0x0D, ["enter"] = 0x0D,
                 ["up"] = 0x26, ["down"] = 0x28, ["left"] = 0x25, ["right"] = 0x27,
+                // "plus" = the main-keyboard +/= key (VK_OEM_PLUS); "keypadplus" = the
+                // numpad +. Needed to reproduce the healing keys (Ctrl+Plus / Shift+Plus)
+                // over REAL keystrokes, which is the only way to catch a layout mismatch
+                // that "modkey" (which bypasses the keyboard entirely) cannot see.
+                ["plus"] = 0xBB, ["keypadplus"] = 0x6B, ["kpplus"] = 0x6B,
+                ["home"] = 0x24, ["end"] = 0x23, ["pageup"] = 0x21, ["pagedown"] = 0x22,
             };
 
             // The letters and function keys the game binds its own actions to (M for the
@@ -1239,9 +1245,40 @@ namespace DevBridge
             catch { /* focus is best-effort */ }
         }
 
-        private static bool TryPressKey(string name, out string error)
+        // Modifier virtual-key codes, held down around the main key so a real
+        // "ctrl+plus" reaches the game exactly as the player's fingers would send it.
+        private const byte VK_CONTROL = 0x11, VK_SHIFT = 0x10, VK_MENU = 0x12; // MENU = Alt
+
+        /// <summary>
+        /// Presses a key, optionally with modifiers: "ctrl+plus", "ctrl+shift+tab",
+        /// "shift+plus", or a bare "i". Modifiers are held down for the duration of the
+        /// key stroke and released in reverse order - a genuine chord, so the mod's
+        /// KeyBindings.IsPressed sees the same Ctrl/Shift state a human would produce.
+        /// This is what lets us tell a dead binding (mod never sees the key) apart from a
+        /// dead action (mod sees it but does nothing).
+        /// </summary>
+        private static bool TryPressKey(string spec, out string error)
         {
             error = null;
+
+            // Split "ctrl+shift+plus" into modifiers + final key. The '+' separators are
+            // the ones BETWEEN tokens; the literal plus key is spelled "plus", never "+".
+            var tokens = spec.Split('+');
+            var mods = new List<byte>();
+            for (int i = 0; i < tokens.Length - 1; i++)
+            {
+                switch (tokens[i].ToLowerInvariant())
+                {
+                    case "ctrl": case "control": mods.Add(VK_CONTROL); break;
+                    case "shift": mods.Add(VK_SHIFT); break;
+                    case "alt": mods.Add(VK_MENU); break;
+                    default:
+                        error = $"unknown modifier '{tokens[i]}' - use ctrl, shift or alt";
+                        return false;
+                }
+            }
+
+            string name = tokens[tokens.Length - 1];
             byte vk;
             if (VirtualKeys.TryGetValue(name, out var mapped))
             {
@@ -1257,8 +1294,11 @@ namespace DevBridge
                 return false;
             }
 
+            // Press modifiers, then the key down+up, then release modifiers in reverse.
+            foreach (var m in mods) keybd_event(m, 0, 0, System.UIntPtr.Zero);
             keybd_event(vk, 0, 0, System.UIntPtr.Zero);
             keybd_event(vk, 0, KEYEVENTF_KEYUP, System.UIntPtr.Zero);
+            for (int i = mods.Count - 1; i >= 0; i--) keybd_event(mods[i], 0, KEYEVENTF_KEYUP, System.UIntPtr.Zero);
             return true;
         }
 

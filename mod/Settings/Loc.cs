@@ -192,6 +192,15 @@ namespace AccessibilityMod.Settings
             ["InvTabOnlyInInventory"] = (
                 "Tab switching works inside the inventory. Press I to open it.",
                 "Tab-Wechsel geht nur im Inventar. Öffne es mit I."),
+            ["InvTabEmpty"] = (
+                "Tab {0}: no items.",
+                "Tab {0}: keine Objekte."),
+            ["InvNoItems"] = (
+                "No items.",
+                "Keine Objekte."),
+            ["InvSlotEmpty"] = (
+                "empty",
+                "leer"),
             // The healing plus buttons (mouse-only in the game).
             ["HealedHealth"] = (
                 "Health restored. {0} health charges left.",

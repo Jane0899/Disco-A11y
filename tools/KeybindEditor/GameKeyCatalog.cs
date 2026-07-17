@@ -58,7 +58,7 @@ public static class GameKeyCatalog
 
         new("InventoryNextTab", "Inventory: next tab", "Inventar: nächster Tab", "Tab|True|False|False", "Tab|True|False|False", "Tab|True|False|False"),
         new("InventoryPrevTab", "Inventory: previous tab", "Inventar: vorheriger Tab", "Tab|True|False|True", "Tab|True|False|True", "Tab|True|False|True"),
-        new("HealHealth", "Use a health healing charge", "Gesundheits-Heilladung verwenden", "Plus|True|False|False", "Plus|True|False|False", "Plus|True|False|False"),
-        new("HealMorale", "Use a morale healing charge", "Moral-Heilladung verwenden", "Plus|False|False|True", "Plus|False|False|True", "Plus|False|False|True"),
+        new("HealHealth", "Use a health healing charge", "Gesundheits-Heilladung verwenden", "Alpha1|True|False|False", "Alpha1|True|False|False", "Alpha1|True|False|False"),
+        new("HealMorale", "Use a morale healing charge", "Moral-Heilladung verwenden", "Alpha2|True|False|False", "Alpha2|True|False|False", "Alpha2|True|False|False"),
     };
 }

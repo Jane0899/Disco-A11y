@@ -127,11 +127,17 @@ namespace AccessibilityMod.Settings
             [GameKey.InventoryNextTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true),
             [GameKey.InventoryPrevTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true, requireShift: true),
 
-            // Ctrl+Plus / Shift+Plus (user decision): the healing plus buttons on the
-            // health and morale bars are mouse-only in the game. KeyCode.Plus is the
-            // character-producing key, so it lands on the German QWERTZ plus key.
-            [GameKey.HealHealth] = new KeyBinding(KeyCode.Plus, requireCtrl: true),
-            [GameKey.HealMorale] = new KeyBinding(KeyCode.Plus, requireShift: true),
+            // Healing (health/morale bar plus buttons, mouse-only in the game).
+            // KeyCode.Plus was the first choice but does NOT fire Input.GetKeyDown on a
+            // German QWERTZ layout (verified live 17.07.2026 - the mod never saw the
+            // key). Punctuation keycodes are layout-bound, exactly the trap this project
+            // moved away from. Digits fire reliably on every layout and need no numpad,
+            // so healing sits on Ctrl+1 (health = first bar) and Ctrl+2 (morale = second
+            // bar). The Ctrl guard keeps them clear of the in-conversation dialogue
+            // number shortcuts (and healing is blocked during dialogue anyway). Base
+            // keys Alpha1/Alpha2 have no plain binding, so no tolerant-match collision.
+            [GameKey.HealHealth] = new KeyBinding(KeyCode.Alpha1, requireCtrl: true),
+            [GameKey.HealMorale] = new KeyBinding(KeyCode.Alpha2, requireCtrl: true),
         };
 
         /// <summary>
@@ -204,8 +210,8 @@ namespace AccessibilityMod.Settings
             // Same in every preset - see Defaults for the reasoning.
             [GameKey.InventoryNextTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true),
             [GameKey.InventoryPrevTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true, requireShift: true),
-            [GameKey.HealHealth] = new KeyBinding(KeyCode.Plus, requireCtrl: true),
-            [GameKey.HealMorale] = new KeyBinding(KeyCode.Plus, requireShift: true),
+            [GameKey.HealHealth] = new KeyBinding(KeyCode.Alpha1, requireCtrl: true),
+            [GameKey.HealMorale] = new KeyBinding(KeyCode.Alpha2, requireCtrl: true),
         };
 
         /// <summary>

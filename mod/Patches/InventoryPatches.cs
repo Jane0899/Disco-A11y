@@ -188,20 +188,25 @@ namespace AccessibilityMod.Patches
             {
                 MelonLogger.Msg($"[InventoryHighlighter] OnSelect called on: {__instance?.name}");
 
+                // Empty grid slots now say a short "leer" instead of staying silent.
+                // The earlier "silent" choice (to avoid an "Empty slot" wall during the
+                // whole-grid scan) backfired: the game compacts items into the first
+                // cells, so navigating the sparse grid lands mostly on empty cells - and
+                // silence there reads as "navigation is broken, I hear nothing" (bug #2,
+                // Jana 17.07.2026). A terse "leer" gives every keypress feedback while
+                // staying far shorter than the old "Empty inventory slot".
+                string emptyLabel = Settings.Loc.Get("InvSlotEmpty");
+
                 // First, try to get InventoryItemSlot component directly on this GameObject
                 var inventoryItemSlot = __instance.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
                 if (inventoryItemSlot != null)
                 {
-                    // Empty slots stay silent (user decision): the grid is mostly empty,
-                    // and hearing "Empty slot" for every one of them buried the items.
                     if (inventoryItemSlot.item != null && !string.IsNullOrEmpty(inventoryItemSlot.item.displayName))
-                    {
                         AnnounceOnce(RTLHelper.FixForScreenReader(inventoryItemSlot.item.displayName));
-                    }
                     else if (!string.IsNullOrEmpty(inventoryItemSlot.itemName))
-                    {
                         AnnounceOnce(RTLHelper.FixForScreenReader(inventoryItemSlot.itemName));
-                    }
+                    else
+                        AnnounceOnce(emptyLabel);
                     return;
                 }
 
@@ -210,13 +215,11 @@ namespace AccessibilityMod.Patches
                 if (childInventoryItemSlot != null)
                 {
                     if (childInventoryItemSlot.item != null && !string.IsNullOrEmpty(childInventoryItemSlot.item.displayName))
-                    {
                         AnnounceOnce(RTLHelper.FixForScreenReader(childInventoryItemSlot.item.displayName));
-                    }
                     else if (!string.IsNullOrEmpty(childInventoryItemSlot.itemName))
-                    {
                         AnnounceOnce(RTLHelper.FixForScreenReader(childInventoryItemSlot.itemName));
-                    }
+                    else
+                        AnnounceOnce(emptyLabel);
                     return;
                 }
 
@@ -230,7 +233,10 @@ namespace AccessibilityMod.Patches
                         MelonLogger.Msg($"[InventoryHighlighter] Found item at slot {slotIndex}: {itemName}");
                         AnnounceOnce(itemName);
                     }
-                    // Empty numbered slots stay silent (user decision).
+                    else
+                    {
+                        AnnounceOnce(emptyLabel); // feedback so navigation never feels dead
+                    }
                 }
                 // Check if this is an equipment slot
                 else
@@ -260,6 +266,47 @@ namespace AccessibilityMod.Patches
     // Helper class for InventoryHighlighter operations
     public static class InventoryHighlighterHelper
     {
+        /// <summary>
+        /// The item text for a selected inventory GameObject, or null if the object is
+        /// not an inventory slot at all (so the caller can fall through to other UI).
+        /// Shared by the OnSelect announcement and the on-demand "announce current
+        /// selection" key (bug #2: pressing that key over an inventory item used to say
+        /// "Current selection has no text" because the generic UI formatter does not know
+        /// inventory slots - only this path does). Empty grid slots return "" (it IS an
+        /// inventory slot, just empty) so the caller can tell "empty slot" from "not an
+        /// inventory object".
+        /// </summary>
+        public static string GetSelectionText(GameObject go)
+        {
+            if (go == null) return null;
+
+            // Only inventory slots carry an InventoryHighlighter - anything else is not
+            // ours to read here.
+            var highlighter = go.GetComponent<Il2Cpp.InventoryHighlighter>();
+            if (highlighter == null) return null;
+
+            var slot = go.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>()
+                       ?? go.GetComponentInChildren<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
+            if (slot != null)
+            {
+                if (slot.item != null && !string.IsNullOrEmpty(slot.item.displayName))
+                    return RTLHelper.FixForScreenReader(slot.item.displayName);
+                if (!string.IsNullOrEmpty(slot.itemName))
+                    return RTLHelper.FixForScreenReader(slot.itemName);
+                return ""; // empty grid slot
+            }
+
+            if (int.TryParse(go.name, out int slotIndex))
+            {
+                return GetInventoryItemAtSlot(slotIndex) ?? ""; // "" = empty grid slot
+            }
+
+            // Equipment slot: real name, or the localized "<slot>: empty".
+            string equipped = GetEquippedItemName(go.name);
+            return !string.IsNullOrEmpty(equipped) ? equipped : GetSlotAnnouncement(go.name);
+        }
+
+
         public static string GetEquippedItemName(string slotName)
         {
             try

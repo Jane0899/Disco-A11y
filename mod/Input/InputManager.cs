@@ -496,6 +496,36 @@ namespace AccessibilityMod.Input
                 if (eventSystem != null)
                 {
                     var currentSelection = eventSystem.currentSelectedGameObject;
+
+                    // In the inventory the focused object is an InventoryHighlighter slot,
+                    // which the GENERIC UI formatter cannot read - only the inventory path
+                    // can. Without this, pressing "announce current selection" over an
+                    // item said "Current selection has no text" and, being interrupting,
+                    // beheaded the tab/count announcement (bug #2). Try the inventory
+                    // resolver first whenever the inventory screen is open.
+                    if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+                    {
+                        string itemText = currentSelection == null
+                            ? null
+                            : Patches.InventoryHighlighterHelper.GetSelectionText(currentSelection);
+
+                        if (!string.IsNullOrEmpty(itemText))
+                        {
+                            // A real item (or an equipment slot's "empty") - read it.
+                            TolkScreenReader.Instance.Speak(itemText, true);
+                            MelonLogger.Msg($"[ON-DEMAND] Inventory selection: {itemText}");
+                            return;
+                        }
+
+                        // itemText == "" (empty grid slot) or null (nothing focused yet):
+                        // say where we are instead of "no text", and do it NON-interrupting
+                        // (Danijel's option 2) so it never cuts off the tab announcement.
+                        // "keine Objekte" when the tab is empty.
+                        TolkScreenReader.Instance.Speak(
+                            Inventory.InventoryNavigationHandler.DescribeCurrentTab(), false);
+                        return;
+                    }
+
                     if (currentSelection != null)
                     {
                         string speechText = UIElementFormatter.FormatUIElementForSpeech(currentSelection);
