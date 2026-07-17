@@ -35,6 +35,58 @@ namespace AccessibilityMod.UI
             public bool isLocked;
         }
 
+        // Selection polling ("what the cabinet says about the thought", user request
+        // 17.07.2026). WHY A POLL AND NOT A HARMONY PATCH: ThoughtSlot.OnSelect is a
+        // VIRTUAL Il2Cpp method - patching it crashed the game natively on the first
+        // selection (verified 17.07.2026; same failure mode as worklog #30). Watching
+        // EventSystem.currentSelectedGameObject once per frame is the safe pattern the
+        // rest of the mod already uses, and a frame of latency is inaudible.
+        private static GameObject lastSelectedSlotObject;
+        private static string lastSlotAnnouncement = "";
+
+        private static void CheckSelectedThought()
+        {
+            try
+            {
+                if (!IsInThoughtCabinetView())
+                {
+                    // Leaving the cabinet resets the tracking, so re-entering announces
+                    // the (re-)selected slot again instead of staying silent.
+                    lastSelectedSlotObject = null;
+                    return;
+                }
+
+                var selected = UnityEngine.EventSystems.EventSystem.current?.currentSelectedGameObject;
+                if (selected == lastSelectedSlotObject) return; // nothing moved
+                lastSelectedSlotObject = selected;
+                if (selected == null) return;
+
+                // The slot component can sit on the selected object itself or a parent
+                // (the game nests the Selectable inside decorated containers).
+                var slot = selected.GetComponent<ThoughtSlot>() ?? selected.GetComponentInParent<ThoughtSlot>();
+                if (slot == null) return;
+
+                var project = slot.Project;
+                // With a thought: the full story from the game's own (localized) data -
+                // name, state, description, research time. Without: the empty/locked
+                // slot info, because a locked slot is something the player can act on.
+                string announcement = project != null
+                    ? FormatThoughtProjectDetails(project)
+                    : DescribeEmptySlot(slot.gameObject);
+
+                if (string.IsNullOrEmpty(announcement)) return;
+                // Same-text guard: the game re-fires selection events for one move.
+                if (announcement == lastSlotAnnouncement && selected == lastSelectedSlotObject) return;
+                lastSlotAnnouncement = announcement;
+
+                TolkScreenReader.Instance.Speak(announcement, true);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error checking selected thought: {ex}");
+            }
+        }
+
         /// <summary>
         /// Handle Thought Cabinet specific keyboard shortcuts
         /// </summary>
@@ -42,6 +94,10 @@ namespace AccessibilityMod.UI
         {
             try
             {
+                // The selection poll runs first and does its own view check - it must
+                // also see the "view just closed" frame to reset its tracking.
+                CheckSelectedThought();
+
                 if (!IsInThoughtCabinetView()) return;
 
                 // Tab key - Read full thought description
@@ -214,6 +270,24 @@ namespace AccessibilityMod.UI
                 MelonLogger.Error($"Error getting full thought details: {ex}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Public entry for the ThoughtSlot.OnSelect patch (ThoughtCompletionPatches):
+        /// keeps the formatting in ONE place so the cabinet browsing announcement and
+        /// the Tab-key detail reading can never drift apart.
+        /// </summary>
+        public static string FormatThoughtProjectDetailsPublic(ThoughtCabinetProject thoughtProject)
+            => FormatThoughtProjectDetails(thoughtProject);
+
+        /// <summary>
+        /// Announcement for a cabinet slot without a thought: "empty" alone would hide
+        /// the one thing the player can act on - a locked slot that skill points unlock.
+        /// </summary>
+        public static string DescribeEmptySlot(GameObject slotObject)
+        {
+            var info = ExtractThoughtSlotInfo(slotObject);
+            return FormatFullThoughtInfo(info);
         }
 
         /// <summary>

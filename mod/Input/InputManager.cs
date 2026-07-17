@@ -216,6 +216,47 @@ namespace AccessibilityMod.Input
                 navigationSystem.StopMovement();
             }
 
+            // Thought splash exit (bug #57b). The research-result splash is modal, its
+            // close button is mouse-only, and NOTHING else closes it from the keyboard -
+            // physical Enter, EventSystem submit and a synthetic click all bounced off in
+            // live testing (17.07.2026). The game's own controller path is the one
+            // working non-mouse exit, so Enter (and the mod's interact key) drive exactly
+            // that: OnControllerButtonToClosePressed, the same call a gamepad B makes.
+            if (UnityEngine.Input.GetKeyDown(KeyCode.Return)
+                || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter)
+                || KeyBindings.IsPressed(GameKey.InteractWithSelected))
+            {
+                if (TryCloseThoughtSplash())
+                {
+                    return; // the key was consumed by the splash - don't also interact
+                }
+            }
+
+            // Inventory tab switching (Ctrl+Tab / Ctrl+Shift+Tab). Both share the Tab base
+            // key and IsPressed tolerates extra modifiers, so the Shift variant must be
+            // checked first. Only acts while the inventory screen is actually open.
+            if (KeyBindings.IsPressed(GameKey.InventoryPrevTab))
+            {
+                if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+                    Inventory.InventoryNavigationHandler.Instance.SwitchTab(backward: true);
+            }
+            else if (KeyBindings.IsPressed(GameKey.InventoryNextTab))
+            {
+                if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+                    Inventory.InventoryNavigationHandler.Instance.SwitchTab(backward: false);
+            }
+
+            // Healing keys (Ctrl+Plus health, Shift+Plus morale). Same base key, disjoint
+            // modifiers - if both are held, health wins deterministically.
+            if (KeyBindings.IsPressed(GameKey.HealHealth))
+            {
+                Patches.HealingKeyActions.HealHealth();
+            }
+            else if (KeyBindings.IsPressed(GameKey.HealMorale))
+            {
+                Patches.HealingKeyActions.HealMorale();
+            }
+
             HandleDialogSafeKeys();
 
             // Handle Thought Cabinet specific input
@@ -223,6 +264,70 @@ namespace AccessibilityMod.Input
         }
 
         private float lastDialogBlockHint;
+
+        /// <summary>
+        /// Closes the thought-research splash if it is the current view. Returns true
+        /// when the splash was there (and the close request was sent), false when there
+        /// is no splash - so the caller knows whether the key press is consumed.
+        /// </summary>
+        private static bool TryCloseThoughtSplash()
+        {
+            try
+            {
+                var view = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                if (view == null || view.GetViewType() != Il2CppSunshine.Views.ViewType.THOUGHTSPLASHSCREEN)
+                {
+                    return false;
+                }
+
+                var splash = view.TryCast<Il2CppSunshine.Views.ThoughtSplashScreenView>();
+                if (splash == null) return false;
+
+                // Two steps, both needed (all single-call paths failed live 17.07.2026:
+                // physical Enter, EventSystem submit, synthetic click and Escape all
+                // bounce off; OnControllerButtonToClosePressed NREs without a gamepad):
+                //  1. SetThoughtStateAndGoBack = the accept bookkeeping (fixes the
+                //     completed thought into its slot, same as the mouse accept).
+                //     Despite the name, its "go back" does NOT change the view.
+                //  2. SwitchToView(CLEAR) = actually leave the modal - the one exit
+                //     that verifiably works without a mouse.
+                try
+                {
+                    // The accept bookkeeping: whatever the game wired onto its close
+                    // button (SetThoughtStateAndGoBack is private and NOT exposed by the
+                    // interop assembly, so the button's own click event is the way in).
+                    splash.buttonClose?.onClick?.Invoke();
+                }
+                catch (System.Exception inner)
+                {
+                    // Bookkeeping failed (no project set, artificial states, ...) - the
+                    // exit below must still run so the player is NEVER trapped.
+                    MelonLogger.Warning($"[THOUGHT] buttonClose invoke failed: {inner.Message}");
+                }
+
+                // The transition must go through the ViewController INSTANCE, exactly
+                // like the dev bridge's working "view CLEAR" command. Calling
+                // View.SwitchToView(ViewType) on the splash itself does nothing - that
+                // is the callback the controller fires, not the initiator (verified
+                // live 17.07.2026: handler ran, view stayed open).
+                var controller = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Views.ViewController>();
+                var clearView = controller?.GetViewByType(Il2CppSunshine.Views.ViewType.CLEAR);
+                if (controller == null || clearView == null)
+                {
+                    MelonLogger.Warning("[THOUGHT] ViewController/CLEAR view not found - cannot close splash");
+                    return true; // key consumed anyway; better silent than a stray interact
+                }
+                controller.SwitchToView(clearView, false, false,
+                    Il2CppSunshine.Views.VIEW_STACK_OPERATION.STACK_PREVIOUS);
+                MelonLogger.Msg("[THOUGHT] Splash closed via keyboard");
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Error($"Error closing thought splash: {ex}");
+                return false;
+            }
+        }
 
         /// <summary>True when a key was pressed whose action is suppressed while the dialogue UI is up.</summary>
         private bool IsAnyWorldNavigationKeyPressed() =>

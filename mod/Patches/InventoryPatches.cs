@@ -157,83 +157,80 @@ namespace AccessibilityMod.Patches
     [HarmonyPatch(typeof(Il2Cpp.InventoryHighlighter), "UnityEngine_EventSystems_ISelectHandler_OnSelect")]
     public static class InventoryHighlighter_OnSelect_Patch
     {
+        // The game fires OnSelect twice per selection (~30 ms apart), so every slot was
+        // announced twice - verified live and all over the player's speech log. The two
+        // calls are indistinguishable at this level, so the fix is a short repeat window:
+        // the same text within half a second is the double-fire, not a new selection.
+        // (Re-selecting the same slot later still announces - that takes > 0.5 s.)
+        private static string lastSpoken = "";
+        private static float lastSpokenTime;
+
+        private static void AnnounceOnce(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            if (text == lastSpoken && UnityEngine.Time.unscaledTime - lastSpokenTime < 0.5f) return;
+
+            // Right after a tab switch the game auto-selects the new tab's first item.
+            // Its announcement and the tab announcement would interrupt each other (both
+            // speak with interrupt=true, 40 ms apart - the player hears neither in
+            // full). The tab announcement already contains the first item's name
+            // ("Ausgewählt: ..."), so this one stays silent inside the window.
+            if (UnityEngine.Time.unscaledTime - InventoryNavigationHandler.LastTabSwitchTime < 0.6f) return;
+
+            lastSpoken = text;
+            lastSpokenTime = UnityEngine.Time.unscaledTime;
+            TolkScreenReader.Instance.Speak(text, true);
+        }
+
         public static void Postfix(Il2Cpp.InventoryHighlighter __instance, BaseEventData eventData)
         {
             try
             {
                 MelonLogger.Msg($"[InventoryHighlighter] OnSelect called on: {__instance?.name}");
-                
+
                 // First, try to get InventoryItemSlot component directly on this GameObject
                 var inventoryItemSlot = __instance.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
                 if (inventoryItemSlot != null)
                 {
-                    MelonLogger.Msg($"[InventoryHighlighter] Found InventoryItemSlot with itemName: '{inventoryItemSlot.itemName}'");
-                    
-                    // Check if this slot has an item
+                    // Empty slots stay silent (user decision): the grid is mostly empty,
+                    // and hearing "Empty slot" for every one of them buried the items.
                     if (inventoryItemSlot.item != null && !string.IsNullOrEmpty(inventoryItemSlot.item.displayName))
                     {
-                        MelonLogger.Msg($"[InventoryHighlighter] Slot has item: '{inventoryItemSlot.item.displayName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(inventoryItemSlot.item.displayName), true);
-                        return;
+                        AnnounceOnce(RTLHelper.FixForScreenReader(inventoryItemSlot.item.displayName));
                     }
                     else if (!string.IsNullOrEmpty(inventoryItemSlot.itemName))
                     {
-                        MelonLogger.Msg($"[InventoryHighlighter] Using slot itemName: '{inventoryItemSlot.itemName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(inventoryItemSlot.itemName), true);
-                        return;
+                        AnnounceOnce(RTLHelper.FixForScreenReader(inventoryItemSlot.itemName));
                     }
-                    else
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] InventoryItemSlot is empty");
-                        TolkScreenReader.Instance.Speak("Empty inventory slot", true);
-                        return;
-                    }
+                    return;
                 }
 
-                // Try to find InventoryItemSlot in children 
+                // Try to find InventoryItemSlot in children
                 var childInventoryItemSlot = __instance.GetComponentInChildren<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
                 if (childInventoryItemSlot != null)
                 {
-                    MelonLogger.Msg($"[InventoryHighlighter] Found child InventoryItemSlot with itemName: '{childInventoryItemSlot.itemName}'");
-                    
                     if (childInventoryItemSlot.item != null && !string.IsNullOrEmpty(childInventoryItemSlot.item.displayName))
                     {
-                        MelonLogger.Msg($"[InventoryHighlighter] Child slot has item: '{childInventoryItemSlot.item.displayName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(childInventoryItemSlot.item.displayName), true);
-                        return;
+                        AnnounceOnce(RTLHelper.FixForScreenReader(childInventoryItemSlot.item.displayName));
                     }
                     else if (!string.IsNullOrEmpty(childInventoryItemSlot.itemName))
                     {
-                        MelonLogger.Msg($"[InventoryHighlighter] Using child slot itemName: '{childInventoryItemSlot.itemName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(childInventoryItemSlot.itemName), true);
-                        return;
+                        AnnounceOnce(RTLHelper.FixForScreenReader(childInventoryItemSlot.itemName));
                     }
-                    else
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Child InventoryItemSlot is empty");
-                        TolkScreenReader.Instance.Speak("Empty inventory slot", true);
-                        return;
-                    }
+                    return;
                 }
 
                 // If no InventoryItemSlot found, check numbered slots via InventoryViewData
-                MelonLogger.Msg($"[InventoryHighlighter] No InventoryItemSlot found on: {__instance?.name}");
-                
                 // Check if this is a numbered slot (regular inventory)
                 if (int.TryParse(__instance?.name, out int slotIndex))
                 {
-                    MelonLogger.Msg($"[InventoryHighlighter] Found numbered slot: {slotIndex}");
                     string itemName = InventoryHighlighterHelper.GetInventoryItemAtSlot(slotIndex);
                     if (!string.IsNullOrEmpty(itemName))
                     {
                         MelonLogger.Msg($"[InventoryHighlighter] Found item at slot {slotIndex}: {itemName}");
-                        TolkScreenReader.Instance.Speak(itemName, true);
+                        AnnounceOnce(itemName);
                     }
-                    else
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Slot {slotIndex} is empty");
-                        TolkScreenReader.Instance.Speak("Empty slot", true);
-                    }
+                    // Empty numbered slots stay silent (user decision).
                 }
                 // Check if this is an equipment slot
                 else
@@ -242,13 +239,13 @@ namespace AccessibilityMod.Patches
                     if (!string.IsNullOrEmpty(equippedItemName))
                     {
                         MelonLogger.Msg($"[InventoryHighlighter] Found equipped item via InventoryViewData: {equippedItemName}");
-                        TolkScreenReader.Instance.Speak(equippedItemName, true);
+                        AnnounceOnce(equippedItemName);
                     }
                     else
                     {
-                        // Announce slot name in a user-friendly way
-                        string slotAnnouncement = InventoryHighlighterHelper.GetSlotAnnouncement(__instance?.name);
-                        TolkScreenReader.Instance.Speak(slotAnnouncement, true);
+                        // Equipment slots keep announcing "empty" - unlike the grid, each of
+                        // them is a distinct place ("Gloves: empty" answers a real question).
+                        AnnounceOnce(InventoryHighlighterHelper.GetSlotAnnouncement(__instance?.name));
                     }
                 }
             }

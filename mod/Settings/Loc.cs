@@ -178,6 +178,62 @@ namespace AccessibilityMod.Settings
             ["UITerm_confirm"] = ("Confirm", "Bestätigen"),
             ["UITerm_accept"] = ("Accept", "Annehmen"),
             ["UITerm_skip"] = ("Skip", "Überspringen"),
+            // Inventory tabs (the game's own labels, translated the way the game shows them).
+            ["InvTab_TOOLS"] = ("Tools", "Werkzeuge"),
+            ["InvTab_CLOTHES"] = ("Clothes", "Kleidung"),
+            ["InvTab_PAWNABLES"] = ("Pawnables", "Pfandgut"),
+            ["InvTab_READING"] = ("Reading", "Lektüre"),
+            ["InvTabWithCount"] = (
+                "Tab {0}: {1} items.",
+                "Tab {0}: {1} Gegenstände."),
+            ["InvTabWithCountOne"] = (
+                "Tab {0}: 1 item.",
+                "Tab {0}: 1 Gegenstand."),
+            ["InvTabOnlyInInventory"] = (
+                "Tab switching works inside the inventory. Press I to open it.",
+                "Tab-Wechsel geht nur im Inventar. Öffne es mit I."),
+            // The healing plus buttons (mouse-only in the game).
+            ["HealedHealth"] = (
+                "Health restored. {0} health charges left.",
+                "Gesundheit aufgefüllt. {0} Gesundheits-Ladungen übrig."),
+            ["HealedMorale"] = (
+                "Morale restored. {0} morale charges left.",
+                "Moral aufgefüllt. {0} Moral-Ladungen übrig."),
+            ["HealNoCharges"] = (
+                "No healing charges left for {0}.",
+                "Keine Heilladungen übrig für {0}."),
+            ["HealNotNeeded"] = (
+                "{0} is already full.",
+                "{0} ist schon voll."),
+            ["HealNoButton"] = (
+                "Healing is not available right now.",
+                "Heilung ist gerade nicht verfügbar."),
+            ["HealWordHealth"] = ("health", "Gesundheit"),
+            ["HealWordMorale"] = ("morale", "Moral"),
+            // The thought cabinet splash screen: the research result a sighted player
+            // reads off the full-screen panel when a thought finishes cooking.
+            ["ThoughtCompleted"] = (
+                "Thought research completed: {0}. Effect: {1}",
+                "Gedanke fertig durchdacht: {0}. Effekt: {1}"),
+            ["ThoughtCompletedNoEffect"] = (
+                "Thought research completed: {0}.",
+                "Gedanke fertig durchdacht: {0}."),
+            // The splash screen a finished thought opens is modal and its close button is
+            // mouse-only - a keyboard player needs to be TOLD how to get out (bug #57b:
+            // "I can walk but not interact" = trapped behind this invisible fullscreen).
+            ["SplashCloseHint"] = (
+                "Press Enter to close this screen.",
+                "Enter schließt diesen Bildschirm."),
+            // Name of the splash for the screen announcer ("which screen am I on?").
+            ["Screen_THOUGHTSPLASHSCREEN"] = (
+                "Research result",
+                "Forschungsergebnis"),
+            // Appended to the tab announcement: the game auto-selects the first item of a
+            // freshly switched tab, and this is how the player learns what it is without
+            // the item announcement and the tab announcement interrupting each other.
+            ["InvTabFirstItem"] = (
+                " Selected: {0}.",
+                " Ausgewählt: {0}."),
         };
 
         /// <summary>Whether we have a name for this key, as opposed to Get's echo of the key itself.</summary>

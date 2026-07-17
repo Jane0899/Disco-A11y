@@ -522,8 +522,133 @@ namespace AccessibilityMod.Inventory
             if (newTab != currentTab)
             {
                 currentTab = newTab;
-                string tabName = newTab.ToString().Replace("_", " ");
-                AnnounceText($"Tab: {tabName}");
+                AnnounceText(DescribeTab(newTab));
+            }
+        }
+
+        /// <summary>
+        /// Set by SwitchTab just before the game refreshes the panel. The game then
+        /// auto-selects the first item of the new tab, whose OnSelect announcement would
+        /// collide with the tab announcement (both interrupt -> the player hears only
+        /// 40 ms of one of them, verified live 17.07.2026). The OnSelect patch checks
+        /// this timestamp and stays silent inside the window; the first item's name is
+        /// folded into the tab announcement below instead - ONE utterance, nothing lost.
+        /// </summary>
+        public static float LastTabSwitchTime { get; private set; } = -10f;
+
+        /// <summary>
+        /// Localized tab name plus how many items it holds ("Tab Kleidung: 4 Gegenstände.") -
+        /// the count is what tells a blind player whether the tab is worth walking through.
+        /// If the tab has items, the auto-selected first one is appended ("Ausgewählt: ...")
+        /// because its own OnSelect announcement is suppressed during a tab switch (see
+        /// LastTabSwitchTime).
+        /// </summary>
+        private static string DescribeTab(ItemTabGroup tab)
+        {
+            string name = Settings.Loc.Get("InvTab_" + tab);
+            int count = 0;
+            string firstItem = null;
+            try
+            {
+                var data = Il2CppSunshine.Metric.InventoryViewData.Singleton;
+                var tabs = data?.tabContents;
+                if (tabs != null && tabs.ContainsKey(tab) && tabs[tab] != null)
+                {
+                    count = tabs[tab].Count;
+
+                    // Slot indices are contiguous from 0 (the game compacts them), so
+                    // slot 0 is the item the game auto-selects after a tab switch. The
+                    // library resolves the internal key ("gloves_garden") to the
+                    // localized display name ("Gelbe Gartenhandschuhe").
+                    if (count > 0 && tabs[tab].ContainsKey(0))
+                    {
+                        var library = data.GetLibrary();
+                        var item = library?.GetByName(tabs[tab][0]);
+                        firstItem = item != null && !string.IsNullOrEmpty(item.displayName)
+                            ? RTLHelper.FixForScreenReader(item.displayName)
+                            : tabs[tab][0];
+                    }
+                }
+            }
+            catch { /* count stays 0 - still announce the tab name */ }
+
+            string text = Settings.Loc.Get(count == 1 ? "InvTabWithCountOne" : "InvTabWithCount", name, count);
+            if (!string.IsNullOrEmpty(firstItem))
+            {
+                text += Settings.Loc.Get("InvTabFirstItem", firstItem);
+            }
+            return text;
+        }
+
+        /// <summary>
+        /// Ctrl+Tab / Ctrl+Shift+Tab: cycle the inventory tabs (Tools, Clothes, Pawnables,
+        /// Reading) with wrap-around. The game's tab buttons are mouse-only, so without
+        /// this key every item outside the currently shown tab is simply unreachable for
+        /// a keyboard player (bug #55: "my gloves and tape reel are gone").
+        ///
+        /// IMPORTANT - which tab API is the real one: the game ships TWO inventory UI
+        /// systems. PageSystemInventoryTabPanel (DiscoPages) is DEAD CODE on PC -
+        /// FindObjectOfType returns null even with the inventory wide open (verified
+        /// live 17.07.2026; same finding as the ScreenAnnouncer counter bug). The PC
+        /// inventory is driven by Il2CppSunshine.InventoryManager: CurrentTab (int,
+        /// writable) plus UpdateCurrentlySelectedTab(), which repaints the panel and -
+        /// through our existing Harmony patch on it - triggers the OnTabChanged
+        /// announcement. So this method only writes the game's own state and pokes the
+        /// game's own refresh; no UI simulation anywhere.
+        /// </summary>
+        public void SwitchTab(bool backward)
+        {
+            try
+            {
+                // Singleton exists for the whole session; the VIEW gate (is the inventory
+                // actually open?) sits in InputManager, not here.
+                var manager = Il2CppSunshine.InventoryManager.Singleton;
+                if (manager == null)
+                {
+                    TolkScreenReader.Instance.Speak(Settings.Loc.Get("InvTabOnlyInInventory"), true);
+                    return;
+                }
+
+                // Tab indices 0..3 = TOOLS, CLOTHES, PAWNABLES, READING - the panel's
+                // left-to-right order, same mapping the ItemTabGroup enum uses. Adding
+                // (length - 1) instead of subtracting 1 keeps the modulo positive.
+                const int tabCount = 4;
+                int next = (manager.CurrentTab + (backward ? tabCount - 1 : 1)) % tabCount;
+
+                manager.CurrentTab = next;
+                // Opens the suppression window BEFORE the refresh below: the game's
+                // auto-select of the new tab's first item fires inside
+                // UpdateCurrentlySelectedTab, and its OnSelect announcement must stay
+                // silent (the tab announcement already carries the item's name).
+                LastTabSwitchTime = UnityEngine.Time.unscaledTime;
+                // The game's own refresh: repaints the grid for the new tab and fires our
+                // UpdateCurrentlySelectedTab patch, which announces "Tab Kleidung: 4
+                // Gegenstände. Ausgewählt: ..." - so there is no separate announcement here.
+                manager.UpdateCurrentlySelectedTab();
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error switching inventory tab: {ex}");
+            }
+        }
+
+        /// <summary>True while the inventory screen is the current view - the tab keys only make sense there.</summary>
+        public static bool IsInventoryViewOpen
+        {
+            get
+            {
+                try
+                {
+                    var view = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                    if (view == null) return false;
+                    var type = view.GetViewType();
+                    return type == Il2CppSunshine.Views.ViewType.INVENTORY
+                        || type == Il2CppSunshine.Views.ViewType.INVENTORY_PAWN;
+                }
+                catch
+                {
+                    return false;
+                }
             }
         }
 

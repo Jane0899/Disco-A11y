@@ -322,6 +322,7 @@ namespace DevBridge
                            "state | objects [maxCount] | spoken [count] | screenshot [file]\n" +
                            "screen (all visible on-screen text - compare against 'spoken' to find silent UI)\n" +
                            "names [n] (name sources per object: unity name vs. conversation)\n" +
+                           "inventory (owned items per tab + equipped + healing charges + UI slot audit)\n" +
                            "key <i|t|j|c|m|f1|...> (game menus; posts a real keystroke, steals window focus)\n" +
                            "modkey <GameKey> | modkeys (fire one of the mod's own hotkeys)\n" +
                            "select npcs|locations|loot|all | cycle [back] | category next|prev\n" +
@@ -565,6 +566,128 @@ namespace DevBridge
 
                     return $"{rows.Count} objects, dialogue language='{lang}', name sources (closest {Math.Min(max, rows.Count)}):\n" +
                            string.Join("\n", rows.OrderBy(r => r.Dist).Take(max).Select(r => r.Line));
+                }
+
+                case "inventory":
+                {
+                    // Ground-truth audit for bug #55 ("I can't find items I received"):
+                    // dumps what the player actually OWNS according to the game's own
+                    // data (InventoryViewData tabContents + equipped slots + healing
+                    // charges), and separately which slot objects are alive in the UI.
+                    // Comparing the two shows whether items are missing from the DATA
+                    // (impossible) or merely unreachable by keyboard NAVIGATION.
+                    var sb = new StringBuilder();
+                    var data = Il2CppSunshine.Metric.InventoryViewData.Singleton;
+                    if (data == null) return "InventoryViewData.Singleton is null";
+
+                    var tabs = data.tabContents;
+                    if (tabs == null) sb.AppendLine("tabContents: null");
+                    else
+                    {
+                        foreach (var tab in tabs)
+                        {
+                            var slots = tab.Value;
+                            sb.AppendLine($"tab {tab.Key} ({(slots == null ? 0 : slots.Count)} items):");
+                            if (slots == null) continue;
+                            foreach (var slot in slots)
+                                sb.AppendLine($"  slot {slot.Key}: {slot.Value}");
+                        }
+                    }
+
+                    sb.AppendLine("equipped:");
+                    foreach (Il2Cpp.EquipmentSlotType st in Enum.GetValues(typeof(Il2Cpp.EquipmentSlotType)))
+                    {
+                        try
+                        {
+                            if (data.IsEquipped(st)) sb.AppendLine($"  {st}: {data.GetEquipped(st)}");
+                        }
+                        catch { /* some enum values are not real slots */ }
+                    }
+
+                    try
+                    {
+                        var pc = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Metric.PlayerCharacter>();
+                        if (pc != null && pc.healingPools != null)
+                        {
+                            sb.AppendLine($"healing charges: health={pc.healingPools.GetHealingChargetsForSkill(Il2CppSunshine.Metric.SkillType.ENDURANCE)}, morale={pc.healingPools.GetHealingChargetsForSkill(Il2CppSunshine.Metric.SkillType.VOLITION)}");
+                        }
+                    }
+                    catch (Exception ex) { sb.AppendLine("healing charges: ERR " + ex.Message); }
+
+                    // Which slot objects exist in the open UI, and can navigation reach them?
+                    var highlighters = UnityEngine.Object.FindObjectsOfType<Il2Cpp.InventoryHighlighter>();
+                    int active = 0;
+                    var uiSb = new StringBuilder();
+                    foreach (var h in highlighters)
+                    {
+                        if (h == null || !h.gameObject.activeInHierarchy) continue;
+                        active++;
+                        var selectable = h.GetComponent<UnityEngine.UI.Selectable>();
+                        string navMode = selectable == null ? "no-selectable"
+                            : selectable.navigation.mode.ToString();
+                        uiSb.AppendLine($"  {h.gameObject.name} | nav={navMode} | interactable={(selectable != null && selectable.interactable)}");
+                    }
+                    sb.AppendLine($"active InventoryHighlighter slots: {active}");
+                    sb.Append(uiSb);
+                    var es2 = UnityEngine.EventSystems.EventSystem.current;
+                    sb.AppendLine($"EventSystem selection: {(es2?.currentSelectedGameObject == null ? "(none)" : es2.currentSelectedGameObject.name)}");
+                    return sb.ToString().TrimEnd();
+                }
+
+                case "thought":
+                {
+                    // Test rig for bug #57 (thought cabinet completion): "thought list"
+                    // shows every ThoughtCabinetProject with its state; "thought discover
+                    // <namepart>" finishes one through the game's own research-completed
+                    // path (CharacterThoughts.DiscoverThought), so the real splash flow
+                    // runs - no waiting for in-game hours to pass.
+                    var sheet = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Metric.CharacterSheet>();
+                    if (sheet == null || sheet.thoughts == null) return "CharacterSheet/thoughts not found";
+
+                    var projects = UnityEngine.Object.FindObjectsOfType<Il2CppSunshine.Metric.ThoughtCabinetProject>(true);
+                    if (parts.Length < 2 || parts[1] == "list")
+                    {
+                        var sb = new StringBuilder();
+                        foreach (var p in projects)
+                        {
+                            if (p == null) continue;
+                            sb.AppendLine($"{p.state,-10} | {p.name} | '{p.displayName}'");
+                        }
+                        return sb.Length == 0 ? "(no thoughts found)" : sb.ToString().TrimEnd();
+                    }
+
+                    if ((parts[1] == "discover" || parts[1] == "splash") && parts.Length >= 3)
+                    {
+                        string part = string.Join(" ", parts.Skip(2)).ToLowerInvariant();
+                        var target = projects.FirstOrDefault(p => p != null &&
+                            ((p.displayName ?? "").ToLowerInvariant().Contains(part)
+                             || (p.name ?? "").ToLowerInvariant().Contains(part)));
+                        if (target == null) return $"no thought matching '{part}'";
+                        var before = target.state;
+                        sheet.thoughts.DiscoverThought(target);
+
+                        if (parts[1] == "splash")
+                        {
+                            // Replicates the REAL research-completed flow, not just the
+                            // state flip: the game queues the discovered thought for the
+                            // splash animation (ThoughtManager) and the HUD sense orb
+                            // then runs the splash screen - the exact path a naturally
+                            // completed thought takes, so the mod's splash patches get
+                            // tested against reality.
+                            var tm = Il2CppSunshine.ThoughtManager.Singleton;
+                            if (tm == null) return "ThoughtManager.Singleton is null";
+                            tm.AddDisoveredThoughtToAnimate(target);
+
+                            var orb = UnityEngine.Object.FindObjectOfType<Il2Cpp.SenseOrb>();
+                            if (orb == null) return "SenseOrb not found (HUD hidden?)";
+                            bool ran = orb.RunThoughtSplashScreen();
+                            return $"splash for '{target.displayName}': queued and RunThoughtSplashScreen -> {ran}";
+                        }
+
+                        return $"DiscoverThought('{target.displayName}') called (state before: {before}, now: {target.state})";
+                    }
+
+                    return "usage: thought [list | discover <namepart> | splash <namepart>]";
                 }
 
                 case "pages":

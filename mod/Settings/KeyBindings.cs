@@ -120,6 +120,18 @@ namespace AccessibilityMod.Settings
             // Ctrl+Y: the mod debugger window. Diagnostic, so it hides behind Ctrl and
             // behind the debug-mode switch.
             [GameKey.OpenModDebugger] = new KeyBinding(KeyCode.Y, requireCtrl: true),
+
+            // Ctrl+Tab / Ctrl+Shift+Tab: the universal "switch tab" convention (user
+            // decision). Plain Tab stays the game's own highlight key - the Ctrl
+            // requirement keeps these from ever colliding with it.
+            [GameKey.InventoryNextTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true),
+            [GameKey.InventoryPrevTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true, requireShift: true),
+
+            // Ctrl+Plus / Shift+Plus (user decision): the healing plus buttons on the
+            // health and morale bars are mouse-only in the game. KeyCode.Plus is the
+            // character-producing key, so it lands on the German QWERTZ plus key.
+            [GameKey.HealHealth] = new KeyBinding(KeyCode.Plus, requireCtrl: true),
+            [GameKey.HealMorale] = new KeyBinding(KeyCode.Plus, requireShift: true),
         };
 
         /// <summary>
@@ -188,6 +200,12 @@ namespace AccessibilityMod.Settings
             // Ctrl+Y: the mod debugger window. Diagnostic, so it hides behind Ctrl and
             // behind the debug-mode switch.
             [GameKey.OpenModDebugger] = new KeyBinding(KeyCode.Y, requireCtrl: true),
+
+            // Same in every preset - see Defaults for the reasoning.
+            [GameKey.InventoryNextTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true),
+            [GameKey.InventoryPrevTab] = new KeyBinding(KeyCode.Tab, requireCtrl: true, requireShift: true),
+            [GameKey.HealHealth] = new KeyBinding(KeyCode.Plus, requireCtrl: true),
+            [GameKey.HealMorale] = new KeyBinding(KeyCode.Plus, requireShift: true),
         };
 
         /// <summary>
