@@ -23,12 +23,11 @@ namespace AccessibilityMod.Patches
     /// mod's world navigation does not go through the UI) but every interaction was
     /// swallowed by the invisible modal - "I can walk but not interact".
     ///
-    /// Two things happen here:
-    ///  1. AnnounceSplash (via the SetProject + OnEnable patches below): read EVERYTHING
-    ///     the splash shows - title, the thought's own musing text, completion effect and
-    ///     the bonus list - not just the name.
-    ///  2. OnEnable additionally puts the keyboard selection on the game's own close
-    ///     button, so Enter leaves the screen the same way a mouse click would.
+    /// AnnounceSplash (via the SetProject + OnEnable patches below) reads EVERYTHING the
+    /// splash shows - title, the thought's own musing text, completion effect and the
+    /// bonus list - not just the name. The keyboard close itself lives in
+    /// InputManager.TryCloseThoughtSplash (Enter / the interact key), which is the single,
+    /// verified-working exit path.
     ///
     /// The third half - "what the cabinet says about the thought" while BROWSING the
     /// cabinet - is deliberately NOT a patch here: ThoughtSlot.OnSelect is a virtual
@@ -131,37 +130,24 @@ namespace AccessibilityMod.Patches
     }
 
     /// <summary>
-    /// OnEnable = the splash is actually visible now. Two jobs:
-    ///  - announce the content (covers the flow where SetProject ran before the panel
-    ///    texts were filled - here they are final),
-    ///  - put the keyboard selection on the game's own close button. The splash opens
-    ///    with NO selection (verified live: "ui selected" -> nothing), and the button is
-    ///    otherwise mouse-only. With the selection set, Unity's input module maps
-    ///    Enter/Space (Submit) to the same click a mouse user makes - no custom close
-    ///    logic that could drift out of sync with the game.
+    /// OnEnable = the splash is actually visible now. Announce the content (this also
+    /// covers the flow where SetProject ran before the panel texts were filled - here
+    /// they are final).
+    ///
+    /// We deliberately do NOT select the close button here. An earlier version did, to
+    /// let Unity's Submit route Enter to the button - but the keyboard close is handled
+    /// explicitly in InputManager.TryCloseThoughtSplash (which invokes buttonClose.onClick
+    /// itself), so selecting the button as well would give Enter two paths to onClick and
+    /// could run the accept bookkeeping (SetThoughtStateAndGoBack) twice per press
+    /// (raised in PR review). One path only: the explicit one, which is the verified-
+    /// working close (Unity's Submit alone did not close the splash in live testing).
     /// </summary>
     [HarmonyPatch(typeof(ThoughtSplashScreenView), "OnEnable")]
     public static class ThoughtSplashScreen_OnEnable_Patch
     {
         public static void Postfix(ThoughtSplashScreenView __instance)
         {
-            try
-            {
-                ThoughtSplashAnnouncer.AnnounceSplash(__instance);
-
-                var button = __instance.buttonClose;
-                var eventSystem = UnityEngine.EventSystems.EventSystem.current;
-                if (button == null || eventSystem == null) return;
-
-                // Select rather than click: the player decides when to leave, we only
-                // make Enter reach the same button the mouse pointer would.
-                eventSystem.SetSelectedGameObject(button.gameObject);
-                MelonLogger.Msg("[THOUGHT] Splash close button selected for keyboard access");
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Error($"Error selecting splash close button: {ex}");
-            }
+            ThoughtSplashAnnouncer.AnnounceSplash(__instance);
         }
     }
 
