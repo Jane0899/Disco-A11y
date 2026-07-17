@@ -27,9 +27,39 @@ internal static class Program
         Application.Run(new MainForm(initialGamePath));
     }
 
+    private static int RunRepair(string gamePath)
+    {
+        if (DiscoA11y.Fixes.ModFixCatalog.IsGameRunning())
+        {
+            Console.WriteLine("FAILED: Disco Elysium is running - close the game first, then repair.");
+            return 1;
+        }
+
+        var exitCode = 0;
+        foreach (var result in DiscoA11y.Fixes.ModFixCatalog.ApplyAll(gamePath))
+        {
+            var name = Strings.Get("FixName_" + result.Fix.Id);
+            switch (result.Outcome)
+            {
+                case DiscoA11y.Fixes.FixOutcome.Applied:
+                    Console.WriteLine($"Repaired: {name}");
+                    break;
+                case DiscoA11y.Fixes.FixOutcome.Failed:
+                    Console.WriteLine($"FAILED: {name} - {result.Error}");
+                    exitCode = 1;
+                    break;
+                default:
+                    Console.WriteLine($"OK (nothing to do): {name}");
+                    break;
+            }
+        }
+        return exitCode;
+    }
+
     /// <summary>
     /// Non-interactive config maintenance:
     ///   DiscoElysiumKeybindEditor.exe --cli [gamePath] [--preset default|numpad|stardew] [--list]
+    ///   DiscoElysiumKeybindEditor.exe --cli [gamePath] --repair   (Disco Doctor, unattended)
     ///
     /// Without --preset this performs a "sync": actions the mod gained since the config
     /// was written are added with their default binding, every existing binding and
@@ -56,6 +86,13 @@ internal static class Program
         {
             Console.WriteLine("FAILED: game folder not found. Pass it explicitly: --cli \"<path>\"");
             return 1;
+        }
+
+        // --repair: the Disco Doctor, unattended - run the shared fix catalog and stop.
+        // Single-purpose on purpose: repairing and config maintenance stay separate steps.
+        if (args.Contains("--repair"))
+        {
+            return RunRepair(gamePath);
         }
 
         var cfgPath = Path.Combine(gamePath, "UserData", "AccessibilityMod.cfg");

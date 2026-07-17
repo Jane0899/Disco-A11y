@@ -156,6 +156,11 @@ public sealed class MainForm : Form
                 Log(Strings.Get("StepMelonLoaderDone"));
             }
 
+            // Known repairs run on every install - preventively (a fresh MelonLoader zip
+            // ships a version.dll that Windows no longer loads) and to heal existing
+            // installs the July 2026 Windows update broke.
+            ApplyFixes(gamePath);
+
             var tag = await ModInstaller.InstallLatestAsync(gamePath, Log,
                 includePrerelease: prereleaseCheck.Checked,
                 confirmOverwrite: (installed, next) =>
@@ -195,6 +200,24 @@ public sealed class MainForm : Form
         {
             installButton.Enabled = true;
             browseButton.Enabled = true;
+        }
+    }
+
+    private void ApplyFixes(string gamePath)
+    {
+        foreach (var result in DiscoA11y.Fixes.ModFixCatalog.ApplyAll(gamePath))
+        {
+            var name = Strings.Get("FixName_" + result.Fix.Id);
+            switch (result.Outcome)
+            {
+                case DiscoA11y.Fixes.FixOutcome.Applied:
+                    Log(Strings.Get("StepFixApplied", name));
+                    break;
+                case DiscoA11y.Fixes.FixOutcome.Failed:
+                    Log(Strings.Get("StepFixFailed", name, result.Error ?? ""));
+                    break;
+                // NotNeeded: nothing worth logging on the happy path
+            }
         }
     }
 

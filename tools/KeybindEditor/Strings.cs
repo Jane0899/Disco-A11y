@@ -63,6 +63,26 @@ public static class Strings
             "Alles Gesprochene in UserData\\SpeechLog.txt mitschreiben (Diagnose - zum späteren Nachlesen, was gesagt wurde)"),
         ["Save"] = ("Save", "Speichern"),
         ["StatusAccessible"] = ("Status", "Status"),
+
+        // The repair window ("Disco Doctor" - the user's name for it): shared fix catalog,
+        // see tools/Shared/ModFixes.cs. One "FixName_<Id>" entry per known fix.
+        ["RepairButton"] = ("Disco Doctor...", "Disco-Doktor..."),
+        ["RepairWindowTitle"] = ("Disco Doctor - check and repair the installation", "Disco-Doktor – Installation prüfen und reparieren"),
+        ["RepairListAccessible"] = ("List of known problems and their state", "Liste bekannter Probleme und ihr Zustand"),
+        ["RepairColumnHeader"] = ("Problem — state", "Problem — Zustand"),
+        ["RepairRun"] = ("Repair now", "Jetzt reparieren"),
+        ["RepairClose"] = ("Close", "Schließen"),
+        ["RepairStateNeeded"] = ("repair needed", "Reparatur nötig"),
+        ["RepairStateOk"] = ("OK", "OK"),
+        ["RepairStateError"] = ("check failed: {0}", "Prüfung fehlgeschlagen: {0}"),
+        ["RepairSummaryNeeded"] = ("{0} problem(s) found. Use 'Repair now'.", "{0} Problem(e) gefunden. Bitte 'Jetzt reparieren' nutzen."),
+        ["RepairNoneNeeded"] = ("Everything OK - no repairs needed.", "Alles in Ordnung – keine Reparatur nötig."),
+        ["RepairDone"] = ("{0} repair(s) applied. Launch the game to check the mod is speaking again.", "{0} Reparatur(en) angewendet. Starte das Spiel und prüfe, ob der Mod wieder spricht."),
+        ["RepairFailed"] = ("Repair failed: {0} - {1}", "Reparatur fehlgeschlagen: {0} - {1}"),
+        ["RepairGameRunning"] = ("Disco Elysium is running - please close the game first, then repair.", "Disco Elysium läuft gerade – bitte zuerst das Spiel beenden, dann reparieren."),
+        ["FixName_MelonLoaderProxy"] = (
+            "Mod silently gone after the July 2026 Windows update (loader proxy must be renamed from version.dll to winmm.dll)",
+            "Mod nach dem Windows-Update vom Juli 2026 stumm verschwunden (Loader-Proxy muss von version.dll in winmm.dll umbenannt werden)"),
         ["LanguageLabel"] = ("Language:", "Sprache:"),
 
         ["StatusGamePathMissing"] = ("Game folder not found. Please use 'Browse...' to select it.", "Spielordner nicht gefunden. Bitte über 'Durchsuchen...' auswählen."),

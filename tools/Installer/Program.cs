@@ -232,6 +232,18 @@ internal static class Program
                 Log("MelonLoader installed.");
             }
 
+            // Known repairs run on every install - preventively (a fresh MelonLoader zip
+            // ships a version.dll that Windows no longer loads) and to heal existing
+            // installs the July 2026 Windows update broke.
+            foreach (var result in DiscoA11y.Fixes.ModFixCatalog.ApplyAll(gamePath))
+            {
+                var name = Strings.Get("FixName_" + result.Fix.Id);
+                if (result.Outcome == DiscoA11y.Fixes.FixOutcome.Applied)
+                    Log($"Repair applied: {name}");
+                else if (result.Outcome == DiscoA11y.Fixes.FixOutcome.Failed)
+                    Log($"Repair FAILED: {name} - {result.Error}");
+            }
+
             var tag = await ModInstaller.InstallLatestAsync(gamePath, Log, includePrerelease);
             Log($"Mod installed (release {tag}).");
 

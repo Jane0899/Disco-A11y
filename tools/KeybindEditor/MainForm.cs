@@ -39,6 +39,7 @@ public sealed class MainForm : Form
     private readonly GroupBox debugGroup;
     private readonly CheckBox debugModeCheck;
     private readonly Button saveButton;
+    private readonly Button repairButton;
     private readonly Label statusLabel;
 
     private ModConfig config = new();
@@ -141,7 +142,10 @@ public sealed class MainForm : Form
         saveButton = new Button { Left = 12, Top = 880, Width = 150 };
         saveButton.Click += SaveButton_Click;
 
-        statusLabel = new Label { Left = 170, Top = 885, Width = 525, Text = "" };
+        repairButton = new Button { Left = 545, Top = 880, Width = 150 };
+        repairButton.Click += RepairButton_Click;
+
+        statusLabel = new Label { Left = 170, Top = 885, Width = 365, Text = "" };
 
         Controls.AddRange(new Control[]
         {
@@ -149,7 +153,7 @@ public sealed class MainForm : Form
             gamePathLabel, gamePathBox, browseButton,
             bindingsList, rebindButton, cancelRebindButton, resetSelectedButton,
             defaultPresetButton, safePresetButton, stardewPresetButton,
-            generalGroup, debugGroup, saveButton, statusLabel,
+            generalGroup, debugGroup, saveButton, repairButton, statusLabel,
         });
 
         ApplyLocalization();
@@ -222,6 +226,8 @@ public sealed class MainForm : Form
         speechLogCheck.Text = Strings.Get("SpeechLog");
         speechLogCheck.AccessibleName = Strings.Get("SpeechLog");
         saveButton.Text = Strings.Get("Save");
+        repairButton.Text = Strings.Get("RepairButton");
+        repairButton.AccessibleName = Strings.Get("RepairButton");
         statusLabel.AccessibleName = Strings.Get("StatusAccessible");
     }
 
@@ -530,6 +536,19 @@ public sealed class MainForm : Form
         {
             testVoiceButton.Enabled = true;
         }
+    }
+
+    private void RepairButton_Click(object? sender, EventArgs e)
+    {
+        var gamePath = gamePathBox.Text.Trim();
+        if (!Directory.Exists(gamePath))
+        {
+            SetStatus(Strings.Get("StatusGamePathMissing"));
+            return;
+        }
+
+        using var form = new RepairForm(gamePath);
+        form.ShowDialog(this);
     }
 
     private void SetStatus(string message)

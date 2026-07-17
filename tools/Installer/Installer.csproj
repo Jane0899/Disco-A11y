@@ -25,6 +25,10 @@
   </Target>
 
   <ItemGroup>
+    <Compile Include="..\Shared\ModFixes.cs" Link="ModFixes.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="TolkNative\Tolk.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>Tolk.dll</Link>

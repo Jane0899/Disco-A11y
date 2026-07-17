@@ -55,6 +55,11 @@ public static class Strings
         ["StepMelonLoaderPresent"] = ("MelonLoader is already installed.", "MelonLoader ist bereits installiert."),
         ["StepMelonLoaderInstalling"] = ("Installing MelonLoader {0} ({1})...", "Installiere MelonLoader {0} ({1})..."),
         ["StepMelonLoaderDone"] = ("MelonLoader installed.", "MelonLoader installiert."),
+        ["StepFixApplied"] = ("Repair applied: {0}", "Reparatur angewendet: {0}"),
+        ["StepFixFailed"] = ("Repair failed: {0} - {1}", "Reparatur fehlgeschlagen: {0} - {1}"),
+        ["FixName_MelonLoaderProxy"] = (
+            "MelonLoader loads again after the July 2026 Windows update (proxy renamed from version.dll to winmm.dll)",
+            "MelonLoader lädt wieder nach dem Windows-Update vom Juli 2026 (Proxy von version.dll in winmm.dll umbenannt)"),
         ["StepMelonLoaderFallback"] = ("Could not determine the latest MelonLoader version ({0}), falling back to {1}.", "Konnte neueste MelonLoader-Version nicht ermitteln ({0}), nutze stattdessen {1}."),
 
         ["StepDownloadingRelease"] = ("Downloading mod release {0}...", "Lade Mod-Release {0} herunter..."),

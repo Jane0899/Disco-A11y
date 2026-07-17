@@ -17,8 +17,12 @@ public static class MelonLoaderInstaller
     private const string FallbackTag = "v0.7.3";
     private const string FallbackBaseUrl = "https://github.com/LavaGang/MelonLoader/releases/download/v0.7.3/";
 
+    // Either proxy name counts as installed: version.dll is what the MelonLoader zip
+    // ships, winmm.dll is what MelonLoaderProxyFix renames it to (the July 2026 Windows
+    // update stops the loader from picking up a local version.dll).
     public static bool IsInstalled(string gamePath) =>
-        File.Exists(Path.Combine(gamePath, "version.dll")) && Directory.Exists(Path.Combine(gamePath, "MelonLoader"));
+        (File.Exists(Path.Combine(gamePath, "version.dll")) || File.Exists(Path.Combine(gamePath, "winmm.dll")))
+        && Directory.Exists(Path.Combine(gamePath, "MelonLoader"));
 
     public static async Task InstallAsync(string gamePath, string gameExePath, Action<string>? statusCallback = null)
     {
