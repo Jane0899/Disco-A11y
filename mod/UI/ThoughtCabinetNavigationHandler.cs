@@ -35,6 +35,63 @@ namespace AccessibilityMod.UI
             public bool isLocked;
         }
 
+        // Selection polling ("what the cabinet says about the thought", user request
+        // 17.07.2026). WHY A POLL AND NOT A HARMONY PATCH: ThoughtSlot.OnSelect is a
+        // VIRTUAL Il2Cpp method - patching it crashed the game natively on the first
+        // selection (verified 17.07.2026; same failure mode as worklog #30). Watching
+        // EventSystem.currentSelectedGameObject once per frame is the safe pattern the
+        // rest of the mod already uses, and a frame of latency is inaudible.
+        private static GameObject lastSelectedSlotObject;
+        private static string lastSlotAnnouncement = "";
+
+        private static void CheckSelectedThought(bool cabinetOpen)
+        {
+            try
+            {
+                if (!cabinetOpen)
+                {
+                    // Leaving the cabinet resets the tracking, so re-entering announces
+                    // the (re-)selected slot again instead of staying silent. BOTH
+                    // fields must reset: clearing only the object left the same-text
+                    // guard armed, so re-entering onto the same slot (same formatted
+                    // text) stayed silent (PR review finding 8).
+                    lastSelectedSlotObject = null;
+                    lastSlotAnnouncement = "";
+                    return;
+                }
+
+                var selected = UnityEngine.EventSystems.EventSystem.current?.currentSelectedGameObject;
+                if (selected == lastSelectedSlotObject) return; // nothing moved
+                lastSelectedSlotObject = selected;
+                if (selected == null) return;
+
+                // The slot component can sit on the selected object itself or a parent
+                // (the game nests the Selectable inside decorated containers).
+                var slot = selected.GetComponent<ThoughtSlot>() ?? selected.GetComponentInParent<ThoughtSlot>();
+                if (slot == null) return;
+
+                var project = slot.Project;
+                // With a thought: the full story from the game's own (localized) data -
+                // name, state, description, research time. Without: the empty/locked
+                // slot info, because a locked slot is something the player can act on.
+                string announcement = project != null
+                    ? FormatThoughtProjectDetails(project)
+                    : DescribeEmptySlot(slot.gameObject);
+
+                if (string.IsNullOrEmpty(announcement)) return;
+                // Same-text guard: the game re-fires selection events for one move, and
+                // two adjacent slots can format identically (e.g. two empty/locked slots).
+                if (announcement == lastSlotAnnouncement) return;
+                lastSlotAnnouncement = announcement;
+
+                TolkScreenReader.Instance.Speak(announcement, true);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error checking selected thought: {ex}");
+            }
+        }
+
         /// <summary>
         /// Handle Thought Cabinet specific keyboard shortcuts
         /// </summary>
@@ -42,7 +99,13 @@ namespace AccessibilityMod.UI
         {
             try
             {
-                if (!IsInThoughtCabinetView()) return;
+                // ONE view check per frame, its result passed down: the poll needs to
+                // see the "view just closed" frame to reset its tracking, and checking
+                // twice per frame doubled the cost for nothing (PR review finding 9).
+                bool cabinetOpen = IsInThoughtCabinetView();
+                CheckSelectedThought(cabinetOpen);
+
+                if (!cabinetOpen) return;
 
                 // Tab key - Read full thought description
                 if (UnityEngine.Input.GetKeyDown(KeyCode.Tab))
@@ -111,20 +174,19 @@ namespace AccessibilityMod.UI
         }
 
         /// <summary>
-        /// Check if we're currently in a Thought Cabinet view
+        /// Check if we're currently in a Thought Cabinet view. Asks the ViewController
+        /// (a cheap static lookup) instead of the old two FindObjectOfType scene scans -
+        /// those ran EVERY frame, mostly while the cabinet was closed (PR review finding
+        /// 9). Same pattern as InventoryNavigationHandler.IsInventoryViewOpen. The old
+        /// second check (THCPage) was DiscoPages, which is dead code on PC - PC screens
+        /// run through Sunshine.Views (same finding as the map/ScreenAnnouncer work).
         /// </summary>
         private static bool IsInThoughtCabinetView()
         {
             try
             {
-                var thoughtCabinetView = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Views.ThoughtCabinetView>();
-                if (thoughtCabinetView != null && thoughtCabinetView.gameObject.activeInHierarchy)
-                {
-                    return true;
-                }
-
-                var thcPage = UnityEngine.Object.FindObjectOfType<THCPage>();
-                return thcPage != null && thcPage.gameObject.activeInHierarchy;
+                var view = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                return view != null && view.GetViewType() == Il2CppSunshine.Views.ViewType.THOUGHTCABINET;
             }
             catch (Exception ex)
             {
@@ -214,6 +276,16 @@ namespace AccessibilityMod.UI
                 MelonLogger.Error($"Error getting full thought details: {ex}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Announcement for a cabinet slot without a thought: "empty" alone would hide
+        /// the one thing the player can act on - a locked slot that skill points unlock.
+        /// </summary>
+        public static string DescribeEmptySlot(GameObject slotObject)
+        {
+            var info = ExtractThoughtSlotInfo(slotObject);
+            return FormatFullThoughtInfo(info);
         }
 
         /// <summary>

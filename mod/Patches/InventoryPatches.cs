@@ -124,7 +124,9 @@ namespace AccessibilityMod.Patches
                     MelonLogger.Msg($"[Inventory] Tab change detected: {lastAnnouncedTab} -> {__instance.CurrentTab}");
                     lastAnnouncedTab = __instance.CurrentTab;
                     
-                    ItemTabGroup tabGroup = (ItemTabGroup)__instance.CurrentTab;
+                    // CurrentTab int -> tab via the ONE shared tab order (PR review
+                    // cleanup: this was a raw enum cast, a fourth encoding of the order).
+                    ItemTabGroup tabGroup = InventoryNavigationHandler.TabFromIndex(__instance.CurrentTab);
                     InventoryNavigationHandler.Instance.OnTabChanged(tabGroup);
                 }
                 else
@@ -139,118 +141,67 @@ namespace AccessibilityMod.Patches
                 MelonLogger.Error($"Error in InventoryManager_UpdateCurrentlySelectedTab_Patch: {ex.Message}");
             }
         }
-        
-        private static string GetTabName(int tabIndex)
-        {
-            switch (tabIndex)
-            {
-                case 0: return "Tools";
-                case 1: return "Clothes";
-                case 2: return "Pawnables";
-                case 3: return "Reading";
-                default: return null;
-            }
-        }
     }
 
     // NEW: InventoryHighlighter patches - the REAL inventory navigation system
     [HarmonyPatch(typeof(Il2Cpp.InventoryHighlighter), "UnityEngine_EventSystems_ISelectHandler_OnSelect")]
     public static class InventoryHighlighter_OnSelect_Patch
     {
+        // The game fires OnSelect twice per selection (~30 ms apart) ON THE SAME CELL,
+        // so every slot was announced twice - verified live and all over the player's
+        // speech log. The repeat guard is keyed on text AND cell identity (PR review
+        // finding 7, Jana's decision): same text from a DIFFERENT cell is a real move -
+        // two adjacent empty cells both saying "leer", or two same-named items - and
+        // must speak; only the technical double-fire of one cell stays silent.
+        // (Re-selecting the same cell later still announces - that takes > 0.5 s.)
+        private static string lastSpoken = "";
+        private static int lastSpokenCellId;
+        private static float lastSpokenTime;
+
+        private static void AnnounceOnce(string text, UnityEngine.GameObject cell)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            int cellId = cell != null ? cell.GetInstanceID() : 0;
+            if (text == lastSpoken && cellId == lastSpokenCellId
+                && UnityEngine.Time.unscaledTime - lastSpokenTime < 0.5f) return;
+
+            // Recorded BEFORE the tab-switch check on purpose: the suppressed
+            // auto-select announcement must still land in the double-fire guard, so its
+            // ~30 ms twin dies there instead of speaking.
+            lastSpoken = text;
+            lastSpokenCellId = cellId;
+            lastSpokenTime = UnityEngine.Time.unscaledTime;
+
+            // Right after a tab switch the game auto-selects the new tab's first cell.
+            // Its announcement and the tab announcement would interrupt each other (both
+            // speak with interrupt=true, 40 ms apart - the player hears neither in
+            // full). The tab announcement already contains the first item's name
+            // ("Ausgewählt: ..."), so exactly this ONE announcement is consumed - a
+            // one-shot flag, not a time window (PR review finding 5, Jana's decision:
+            // every real move right after the switch speaks).
+            if (InventoryNavigationHandler.ConsumeTabSwitchSuppression()) return;
+
+            TolkScreenReader.Instance.Speak(text, true);
+        }
+
         public static void Postfix(Il2Cpp.InventoryHighlighter __instance, BaseEventData eventData)
         {
             try
             {
-                MelonLogger.Msg($"[InventoryHighlighter] OnSelect called on: {__instance?.name}");
-                
-                // First, try to get InventoryItemSlot component directly on this GameObject
-                var inventoryItemSlot = __instance.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
-                if (inventoryItemSlot != null)
-                {
-                    MelonLogger.Msg($"[InventoryHighlighter] Found InventoryItemSlot with itemName: '{inventoryItemSlot.itemName}'");
-                    
-                    // Check if this slot has an item
-                    if (inventoryItemSlot.item != null && !string.IsNullOrEmpty(inventoryItemSlot.item.displayName))
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Slot has item: '{inventoryItemSlot.item.displayName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(inventoryItemSlot.item.displayName), true);
-                        return;
-                    }
-                    else if (!string.IsNullOrEmpty(inventoryItemSlot.itemName))
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Using slot itemName: '{inventoryItemSlot.itemName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(inventoryItemSlot.itemName), true);
-                        return;
-                    }
-                    else
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] InventoryItemSlot is empty");
-                        TolkScreenReader.Instance.Speak("Empty inventory slot", true);
-                        return;
-                    }
-                }
+                if (__instance == null) return;
+                MelonLogger.Msg($"[InventoryHighlighter] OnSelect called on: {__instance.name}");
 
-                // Try to find InventoryItemSlot in children 
-                var childInventoryItemSlot = __instance.GetComponentInChildren<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
-                if (childInventoryItemSlot != null)
-                {
-                    MelonLogger.Msg($"[InventoryHighlighter] Found child InventoryItemSlot with itemName: '{childInventoryItemSlot.itemName}'");
-                    
-                    if (childInventoryItemSlot.item != null && !string.IsNullOrEmpty(childInventoryItemSlot.item.displayName))
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Child slot has item: '{childInventoryItemSlot.item.displayName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(childInventoryItemSlot.item.displayName), true);
-                        return;
-                    }
-                    else if (!string.IsNullOrEmpty(childInventoryItemSlot.itemName))
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Using child slot itemName: '{childInventoryItemSlot.itemName}'");
-                        TolkScreenReader.Instance.Speak(RTLHelper.FixForScreenReader(childInventoryItemSlot.itemName), true);
-                        return;
-                    }
-                    else
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Child InventoryItemSlot is empty");
-                        TolkScreenReader.Instance.Speak("Empty inventory slot", true);
-                        return;
-                    }
-                }
-
-                // If no InventoryItemSlot found, check numbered slots via InventoryViewData
-                MelonLogger.Msg($"[InventoryHighlighter] No InventoryItemSlot found on: {__instance?.name}");
-                
-                // Check if this is a numbered slot (regular inventory)
-                if (int.TryParse(__instance?.name, out int slotIndex))
-                {
-                    MelonLogger.Msg($"[InventoryHighlighter] Found numbered slot: {slotIndex}");
-                    string itemName = InventoryHighlighterHelper.GetInventoryItemAtSlot(slotIndex);
-                    if (!string.IsNullOrEmpty(itemName))
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Found item at slot {slotIndex}: {itemName}");
-                        TolkScreenReader.Instance.Speak(itemName, true);
-                    }
-                    else
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Slot {slotIndex} is empty");
-                        TolkScreenReader.Instance.Speak("Empty slot", true);
-                    }
-                }
-                // Check if this is an equipment slot
-                else
-                {
-                    string equippedItemName = InventoryHighlighterHelper.GetEquippedItemName(__instance?.name);
-                    if (!string.IsNullOrEmpty(equippedItemName))
-                    {
-                        MelonLogger.Msg($"[InventoryHighlighter] Found equipped item via InventoryViewData: {equippedItemName}");
-                        TolkScreenReader.Instance.Speak(equippedItemName, true);
-                    }
-                    else
-                    {
-                        // Announce slot name in a user-friendly way
-                        string slotAnnouncement = InventoryHighlighterHelper.GetSlotAnnouncement(__instance?.name);
-                        TolkScreenReader.Instance.Speak(slotAnnouncement, true);
-                    }
-                }
+                // ONE resolution chain for "what does this slot say" - the same
+                // GetSelectionText the on-demand announce key uses (this patch used to
+                // carry its own copy of the whole four-step chain; PR review cleanup).
+                // "" = an empty GRID slot: it speaks a terse "leer" so navigating the
+                // sparse grid never feels dead (bug #2, Jana 17.07.2026) while staying
+                // far shorter than the old "Empty inventory slot". Equipment slots come
+                // back as "Gloves: empty" from the helper - each of those is a distinct
+                // place, so the full wording answers a real question there.
+                string text = InventoryHighlighterHelper.GetSelectionText(__instance.gameObject);
+                AnnounceOnce(text == "" ? Settings.Loc.Get("InvSlotEmpty") : text, __instance.gameObject);
             }
             catch (Exception ex)
             {
@@ -263,6 +214,47 @@ namespace AccessibilityMod.Patches
     // Helper class for InventoryHighlighter operations
     public static class InventoryHighlighterHelper
     {
+        /// <summary>
+        /// The item text for a selected inventory GameObject, or null if the object is
+        /// not an inventory slot at all (so the caller can fall through to other UI).
+        /// Shared by the OnSelect announcement and the on-demand "announce current
+        /// selection" key (bug #2: pressing that key over an inventory item used to say
+        /// "Current selection has no text" because the generic UI formatter does not know
+        /// inventory slots - only this path does). Empty grid slots return "" (it IS an
+        /// inventory slot, just empty) so the caller can tell "empty slot" from "not an
+        /// inventory object".
+        /// </summary>
+        public static string GetSelectionText(GameObject go)
+        {
+            if (go == null) return null;
+
+            // Only inventory slots carry an InventoryHighlighter - anything else is not
+            // ours to read here.
+            var highlighter = go.GetComponent<Il2Cpp.InventoryHighlighter>();
+            if (highlighter == null) return null;
+
+            var slot = go.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>()
+                       ?? go.GetComponentInChildren<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
+            if (slot != null)
+            {
+                if (slot.item != null && !string.IsNullOrEmpty(slot.item.displayName))
+                    return RTLHelper.FixForScreenReader(slot.item.displayName);
+                if (!string.IsNullOrEmpty(slot.itemName))
+                    return RTLHelper.FixForScreenReader(slot.itemName);
+                return ""; // empty grid slot
+            }
+
+            if (int.TryParse(go.name, out int slotIndex))
+            {
+                return GetInventoryItemAtSlot(slotIndex) ?? ""; // "" = empty grid slot
+            }
+
+            // Equipment slot: real name, or the localized "<slot>: empty".
+            string equipped = GetEquippedItemName(go.name);
+            return !string.IsNullOrEmpty(equipped) ? equipped : GetSlotAnnouncement(go.name);
+        }
+
+
         public static string GetEquippedItemName(string slotName)
         {
             try
@@ -367,10 +359,11 @@ namespace AccessibilityMod.Patches
                     var tabContents = inventoryData.tabContents;
                     if (tabContents == null) return null;
 
-                    // Check if we're in pawn shop by looking at active view type
-                    var currentView = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Views.View>();
-                    bool isInPawnShop = currentView != null &&
-                                       currentView.GetViewType() == Il2CppSunshine.Views.ViewType.INVENTORY_PAWN;
+                    // Pawn shop or normal inventory? Asked via the same single source of
+                    // truth as every other "which view?" question (PR review cleanup: the
+                    // old FindObjectOfType<View> grabbed an ARBITRARY view object of the
+                    // scene, on top of being a scene scan).
+                    bool isInPawnShop = InventoryNavigationHandler.IsPawnShopOpen;
 
                     if (isInPawnShop)
                     {
@@ -423,6 +416,27 @@ namespace AccessibilityMod.Patches
                 MelonLogger.Msg($"Error getting inventory item at slot {slotIndex}: {ex.Message}");
             }
             return null;
+        }
+
+        /// <summary>
+        /// Just the speakable NAME of an item key ("gloves_garden" -> "Gelbe
+        /// Gartenhandschuhe"), with the same displayName -> listName -> raw-key fallback
+        /// chain the full formatter uses (PR review cleanup: DescribeTab resolved names
+        /// itself and skipped the listName step, so a missing displayName leaked the raw
+        /// internal key into speech). For the full read - bonuses, description, value -
+        /// use GetFormattedItemName instead.
+        /// </summary>
+        public static string GetItemDisplayName(string itemName, Il2CppSunshine.Metric.InventoryViewData inventoryData)
+        {
+            if (string.IsNullOrEmpty(itemName)) return null;
+
+            var item = inventoryData?.GetLibrary()?.GetByName(itemName);
+            if (item != null)
+            {
+                if (!string.IsNullOrEmpty(item.displayName)) return RTLHelper.FixForScreenReader(item.displayName);
+                if (!string.IsNullOrEmpty(item.listName)) return RTLHelper.FixForScreenReader(item.listName);
+            }
+            return RTLHelper.FixForScreenReader(itemName);
         }
 
         private static string GetFormattedItemName(string itemName, Il2CppSunshine.Metric.InventoryViewData inventoryData)

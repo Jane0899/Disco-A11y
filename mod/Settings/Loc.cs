@@ -178,6 +178,92 @@ namespace AccessibilityMod.Settings
             ["UITerm_confirm"] = ("Confirm", "Bestätigen"),
             ["UITerm_accept"] = ("Accept", "Annehmen"),
             ["UITerm_skip"] = ("Skip", "Überspringen"),
+            // Inventory tabs (the game's own labels, translated the way the game shows them).
+            ["InvTab_TOOLS"] = ("Tools", "Werkzeuge"),
+            ["InvTab_CLOTHES"] = ("Clothes", "Kleidung"),
+            ["InvTab_PAWNABLES"] = ("Pawnables", "Pfandgut"),
+            ["InvTab_READING"] = ("Reading", "Lektüre"),
+            ["InvTabWithCount"] = (
+                "Tab {0}: {1} items.",
+                "Tab {0}: {1} Gegenstände."),
+            ["InvTabWithCountOne"] = (
+                "Tab {0}: 1 item.",
+                "Tab {0}: 1 Gegenstand."),
+            // Only reachable with the inventory OPEN but the game's InventoryManager
+            // missing - an internal error, not a closed inventory. The old text ("Press I
+            // to open it") gave instructions that were wrong in the only situation the
+            // line can play (PR review cleanup).
+            ["InvTabUnavailable"] = (
+                "Tab switching is not available right now.",
+                "Tab-Wechsel ist gerade nicht möglich."),
+            ["InvTabEmpty"] = (
+                "Tab {0}: no items.",
+                "Tab {0}: keine Objekte."),
+            ["InvNoItems"] = (
+                "No items.",
+                "Keine Objekte."),
+            // Neutral tab announcement when the item COUNT could not be read: claiming
+            // "no items" on an interop error would sell a full tab as empty (PR review
+            // cleanup). {0} = tab name.
+            ["InvTabNoCount"] = (
+                "Tab {0}.",
+                "Tab {0}."),
+            // The current tab itself could not be determined - neutral, no invented state.
+            ["InvTabReadError"] = (
+                "Inventory tab could not be read.",
+                "Inventar-Tab konnte nicht gelesen werden."),
+            ["InvSlotEmpty"] = (
+                "empty",
+                "leer"),
+            // The healing plus buttons (mouse-only in the game).
+            ["HealedHealth"] = (
+                "Health restored. {0} health charges left.",
+                "Gesundheit aufgefüllt. {0} Gesundheits-Ladungen übrig."),
+            ["HealedMorale"] = (
+                "Morale restored. {0} morale charges left.",
+                "Moral aufgefüllt. {0} Moral-Ladungen übrig."),
+            ["HealNoCharges"] = (
+                "No healing charges left for {0}.",
+                "Keine Heilladungen übrig für {0}."),
+            ["HealNotNeeded"] = (
+                "{0} is already full.",
+                "{0} ist schon voll."),
+            ["HealNoButton"] = (
+                "Healing is not available right now.",
+                "Heilung ist gerade nicht verfügbar."),
+            ["HealWordHealth"] = ("health", "Gesundheit"),
+            ["HealWordMorale"] = ("morale", "Moral"),
+            // Healed, but the charge count could not be read: say so honestly instead of
+            // fabricating a number (PR review cleanup - the old code could announce "0
+            // charges left" when the true count was simply unknown). {0} = health/morale.
+            ["HealedNoCount"] = (
+                "{0} restored.",
+                "{0} aufgefüllt."),
+            // The thought cabinet splash screen: the research result a sighted player
+            // reads off the full-screen panel when a thought finishes cooking.
+            // (A "ThoughtCompleted" variant with an effect slot existed here but was
+            // never referenced - removed as dead, the effect travels as its own part.)
+            ["ThoughtCompletedNoEffect"] = (
+                "Thought research completed: {0}.",
+                "Gedanke fertig durchdacht: {0}."),
+            // The splash screen a finished thought opens is modal and its close button is
+            // mouse-only - a keyboard player needs to be TOLD how to get out (bug #57b:
+            // "I can walk but not interact" = trapped behind this invisible fullscreen).
+            // {0} = the speakable name of the LIVE CloseSplash binding, so the hint stays
+            // right after remapping (never hardcode key names in announcements).
+            ["SplashCloseHint"] = (
+                "Press {0} to close this screen.",
+                "{0} schließt diesen Bildschirm."),
+            // Name of the splash for the screen announcer ("which screen am I on?").
+            ["Screen_THOUGHTSPLASHSCREEN"] = (
+                "Research result",
+                "Forschungsergebnis"),
+            // Appended to the tab announcement: the game auto-selects the first item of a
+            // freshly switched tab, and this is how the player learns what it is without
+            // the item announcement and the tab announcement interrupting each other.
+            ["InvTabFirstItem"] = (
+                " Selected: {0}.",
+                " Ausgewählt: {0}."),
         };
 
         /// <summary>Whether we have a name for this key, as opposed to Get's echo of the key itself.</summary>

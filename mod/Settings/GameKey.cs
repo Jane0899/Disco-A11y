@@ -58,5 +58,24 @@ namespace AccessibilityMod.Settings
 
         /// <summary>Opens the mod debugger in its own window (live transcript + comments).</summary>
         OpenModDebugger,
+
+        /// <summary>Next inventory tab (Tools, Clothes, Pawnables, Reading). The game's tab
+        /// buttons are mouse-only - without this key, items in other tabs are unreachable.</summary>
+        InventoryNextTab,
+
+        /// <summary>Previous inventory tab.</summary>
+        InventoryPrevTab,
+
+        /// <summary>Consume a health healing charge - the keyboard equivalent of clicking
+        /// the plus button on the health bar, which is mouse-only in the game.</summary>
+        HealHealth,
+
+        /// <summary>Consume a morale healing charge (the plus button on the morale bar).</summary>
+        HealMorale,
+
+        /// <summary>Close the thought-research splash screen (whose own close button is
+        /// mouse-only). Was hardcoded Enter at first - made remappable because EVERY mod
+        /// hotkey must be a GameKey, visible to the configurator (PR review finding 10).</summary>
+        CloseSplash,
     }
 }

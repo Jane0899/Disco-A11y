@@ -55,5 +55,14 @@ public static class GameKeyCatalog
         new("DescribeAreaFull", "Full introduction of the area (what kind of place is this?)", "Ausführliche Einführung des Bereichs (was ist das hier für ein Ort?)", "U|True|False|False", "U|True|False|False", "U|True|False|False"),
         new("DescribeItem", "Describe the selected object (what even is this?)", "Das ausgewählte Objekt beschreiben (was ist das überhaupt?)", "B|False|False|False", "B|False|False|False", "B|False|False|False"),
         new("OpenModDebugger", "Open the mod debugger window (debug mode only)", "Mod-Debugger-Fenster öffnen (nur im Debug-Modus)", "Y|True|False|False", "Y|True|False|False", "Y|True|False|False"),
+
+        new("InventoryNextTab", "Inventory: next tab", "Inventar: nächster Tab", "Tab|True|False|False", "Tab|True|False|False", "Tab|True|False|False"),
+        new("InventoryPrevTab", "Inventory: previous tab", "Inventar: vorheriger Tab", "Tab|True|False|True", "Tab|True|False|True", "Tab|True|False|True"),
+        // Healing shares base key H with AnnounceStatus on purpose (H = the "how are
+        // health and morale?" key); digits are off limits - the game reads them in
+        // dialogue regardless of Ctrl and would commit a dialogue option.
+        new("HealHealth", "Use a health healing charge", "Gesundheits-Heilladung verwenden", "H|True|False|False", "H|True|False|False", "H|True|False|False"),
+        new("HealMorale", "Use a morale healing charge", "Moral-Heilladung verwenden", "H|False|False|True", "H|False|False|True", "H|False|False|True"),
+        new("CloseSplash", "Close the thought research screen", "Forschungsergebnis-Bildschirm schließen", "Return|False|False|False", "Return|False|False|False", "Return|False|False|False"),
     };
 }

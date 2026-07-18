@@ -93,7 +93,17 @@ namespace AccessibilityMod.UI
             string extra = GetScreenContext(viewType);
 
             string announcement = string.IsNullOrEmpty(extra) ? title : $"{title}. {extra}";
-            TolkScreenReader.Instance.Speak(announcement, true);
+            // The thought splash announces its full research result the moment it opens
+            // (ThoughtCompletionPatches) - a long, interrupting read. The screen NAME
+            // must queue behind it, not behead it after 300 ms - and it needs the REAL
+            // queue guarantee: Speak(interrupt: false) gets promoted to interrupting
+            // when the player's global speech-interrupt setting is on and would still
+            // cut the result read (PR review finding 3). Every other screen keeps
+            // interrupting: there the name IS the primary information.
+            if (viewType == ViewType.THOUGHTSPLASHSCREEN)
+                TolkScreenReader.Instance.SpeakNeverInterrupt(announcement);
+            else
+                TolkScreenReader.Instance.Speak(announcement, true);
             MelonLogger.Msg($"[SCREEN] Opened: {viewType} -> {announcement}");
         }
 
@@ -102,11 +112,16 @@ namespace AccessibilityMod.UI
         /// the game renders ("GEDANKENKABINETT"). Falls back to the class name so a screen
         /// without a heading is still announced rather than silently skipped.
         /// </summary>
-        /// <summary>Screens a player opens on purpose - the ones worth announcing.</summary>
+        /// <summary>Screens a player opens on purpose - the ones worth announcing.
+        /// THOUGHTSPLASHSCREEN is the exception to "opens on purpose": the GAME opens it
+        /// when a thought finishes cooking, which is precisely why it must be announced -
+        /// a modal fullscreen the player never asked for is otherwise a silent trap
+        /// (bug #57b).</summary>
         private static bool IsPlayerScreen(ViewType viewType) =>
             viewType == ViewType.INVENTORY ||
             viewType == ViewType.CHARACTERSHEET ||
             viewType == ViewType.THOUGHTCABINET ||
+            viewType == ViewType.THOUGHTSPLASHSCREEN ||
             viewType == ViewType.JOURNAL ||
             viewType == ViewType.OPTIONS ||
             viewType == ViewType.SAVE ||
@@ -121,21 +136,22 @@ namespace AccessibilityMod.UI
         /// displays them is off screen.
         /// </summary>
         /// <summary>
-        /// How many items you are carrying. The game keeps no "my items" list in its model
-        /// (Sunshine.Inventory only has actions, and InventoryItemList is the catalogue of
-        /// every item that exists), so this counts the filled slots of the open inventory -
-        /// exactly what a sighted player sees on the panel.
+        /// How many items you are carrying, summed over all inventory tabs. Counted from
+        /// InventoryViewData.tabContents, the game's own per-tab item model. (The previous
+        /// version counted DiscoPages InventoryItemSlot components - a page system that is
+        /// dead code on PC, so the count was always zero: "Inventar. 0 Gegenstände.")
         /// </summary>
         private static int CountCarriedItems()
         {
             try
             {
+                var tabs = Il2CppSunshine.Metric.InventoryViewData.Singleton?.tabContents;
+                if (tabs == null) return -1;
+
                 int count = 0;
-                foreach (var slot in UnityEngine.Object.FindObjectsOfType<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>())
+                foreach (var tab in tabs)
                 {
-                    if (slot == null || !slot.gameObject.activeInHierarchy) continue;
-                    if (string.IsNullOrWhiteSpace(slot.itemName)) continue;
-                    count++;
+                    if (tab.Value != null) count += tab.Value.Count;
                 }
                 return count;
             }

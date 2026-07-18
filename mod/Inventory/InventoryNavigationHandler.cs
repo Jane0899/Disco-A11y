@@ -69,15 +69,12 @@ namespace AccessibilityMod.Inventory
         {
             try
             {
-                // Check for InventoryView or InventoryPage active in scene
-                var inventoryView = UnityEngine.Object.FindObjectOfType<InventoryView>();
-                var inventoryPage = UnityEngine.Object.FindObjectOfType<InventoryPage>();
-                var inventoryItemsPage = UnityEngine.Object.FindObjectOfType<InventoryItemsPage>();
-
+                // One source of truth for "is the inventory open?": the ViewController
+                // (PR review cleanup - this poll used to run three FindObjectOfType scene
+                // scans per frame AND could disagree with IsInventoryViewOpen, which the
+                // key handling already trusted).
                 bool wasOpen = isInventoryOpen;
-                isInventoryOpen = (inventoryView != null && inventoryView.gameObject.activeInHierarchy) ||
-                                 (inventoryPage != null && inventoryPage.gameObject.activeInHierarchy) ||
-                                 (inventoryItemsPage != null && inventoryItemsPage.gameObject.activeInHierarchy);
+                isInventoryOpen = IsInventoryViewOpen;
 
                 // Announce state changes
                 if (isInventoryOpen && !wasOpen)
@@ -522,8 +519,243 @@ namespace AccessibilityMod.Inventory
             if (newTab != currentTab)
             {
                 currentTab = newTab;
-                string tabName = newTab.ToString().Replace("_", " ");
-                AnnounceText($"Tab: {tabName}");
+                AnnounceText(DescribeTab(newTab));
+            }
+        }
+
+        // One-shot suppression of the auto-select announcement after a tab switch.
+        // The game auto-selects the new tab's first cell right after SwitchTab, and its
+        // OnSelect announcement would collide with the tab announcement, which already
+        // carries the first item's name (both interrupt -> the player hears only 40 ms
+        // of one of them, verified live 17.07.2026). A 0.6 s TIME WINDOW sat here
+        // before and swallowed EVERY announcement inside it - including the user's own
+        // fast arrow moves right after the switch (PR review finding 5; Jana's pick:
+        // one-shot flag). The timestamp is only a staleness backstop: should the
+        // auto-select ever not fire, an armed flag must not lie in wait and swallow the
+        // user's next real move much later.
+        private static bool suppressNextSelectAnnouncement;
+        private static float suppressArmedTime;
+
+        /// <summary>Arm the one-shot suppression - called by SwitchTab only.</summary>
+        private static void ArmTabSwitchSuppression()
+        {
+            suppressNextSelectAnnouncement = true;
+            suppressArmedTime = UnityEngine.Time.unscaledTime;
+        }
+
+        /// <summary>
+        /// True exactly once per tab switch: for the first OnSelect announcement after
+        /// arming (the game's auto-select). A stale flag (no auto-select within 1 s)
+        /// reports false, so a late real move is never swallowed.
+        /// </summary>
+        public static bool ConsumeTabSwitchSuppression()
+        {
+            if (!suppressNextSelectAnnouncement) return false;
+            suppressNextSelectAnnouncement = false;
+            return UnityEngine.Time.unscaledTime - suppressArmedTime < 1f;
+        }
+
+        /// <summary>
+        /// THE tab order - the panel's left-to-right order, which is also how the game's
+        /// InventoryManager.CurrentTab int counts. Single source of truth: SwitchTab,
+        /// DescribeCurrentTab and the CurrentTab->enum mapping in InventoryPatches all
+        /// derive from this one array (it used to be encoded four times; PR review
+        /// cleanup).
+        /// </summary>
+        internal static readonly ItemTabGroup[] TabOrder =
+            { ItemTabGroup.TOOLS, ItemTabGroup.CLOTHES, ItemTabGroup.PAWNABLES, ItemTabGroup.READING };
+
+        /// <summary>The game's CurrentTab int as an ItemTabGroup, clamped to a valid tab.</summary>
+        internal static ItemTabGroup TabFromIndex(int index) =>
+            TabOrder[index >= 0 && index < TabOrder.Length ? index : 0];
+
+        /// <summary>
+        /// Public entry for "where am I in the inventory?" - the current tab and how many
+        /// items it holds, "keine Objekte" when empty. Used by the on-demand announce key
+        /// as a non-interrupting fallback when no item is focused (bug #2).
+        /// </summary>
+        public static string DescribeCurrentTab()
+        {
+            try
+            {
+                var manager = Il2CppSunshine.InventoryManager.Singleton;
+                return DescribeTab(TabFromIndex(manager != null ? manager.CurrentTab : 0));
+            }
+            catch (Exception ex)
+            {
+                // Say honestly that the tab is unreadable - "no items" here would sell an
+                // interop error as an empty inventory (PR review cleanup).
+                MelonLogger.Warning($"[Inventory] DescribeCurrentTab failed: {ex.Message}");
+                return Settings.Loc.Get("InvTabReadError");
+            }
+        }
+
+        /// <summary>
+        /// Localized tab name plus how many items it holds ("Tab Kleidung: 4 Gegenstände.") -
+        /// the count is what tells a blind player whether the tab is worth walking through.
+        /// If the tab has items, the auto-selected first one is appended ("Ausgewählt: ...")
+        /// because its own OnSelect announcement is suppressed during a tab switch (see
+        /// LastTabSwitchTime).
+        /// </summary>
+        private static string DescribeTab(ItemTabGroup tab)
+        {
+            string name = Settings.Loc.Get("InvTab_" + tab);
+            int count = 0;
+            bool countReadable = false;
+            string firstItem = null;
+            try
+            {
+                var data = Il2CppSunshine.Metric.InventoryViewData.Singleton;
+                var tabs = data?.tabContents;
+                if (tabs != null && tabs.ContainsKey(tab) && tabs[tab] != null)
+                {
+                    count = tabs[tab].Count;
+                    countReadable = true;
+
+                    // Slot indices are contiguous from 0 (the game compacts them), so
+                    // slot 0 is normally the item the game auto-selects after a tab
+                    // switch - but guard against a hole at 0 by falling back to the
+                    // lowest occupied slot (PR review cleanup).
+                    if (count > 0)
+                    {
+                        int firstSlot = int.MaxValue;
+                        if (tabs[tab].ContainsKey(0))
+                        {
+                            firstSlot = 0;
+                        }
+                        else
+                        {
+                            foreach (var slotIndex in tabs[tab].Keys)
+                            {
+                                if (slotIndex < firstSlot) firstSlot = slotIndex;
+                            }
+                        }
+                        if (firstSlot != int.MaxValue)
+                        {
+                            // The library resolves the internal key ("gloves_garden") to
+                            // the localized display name ("Gelbe Gartenhandschuhe"), with
+                            // the shared listName/raw-key fallback chain.
+                            firstItem = Patches.InventoryHighlighterHelper.GetItemDisplayName(
+                                tabs[tab][firstSlot], data);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Logged, and the announcement stays NEUTRAL below: claiming "no items"
+                // on an interop error would sell a full tab as empty (PR review cleanup).
+                MelonLogger.Warning($"[Inventory] DescribeTab({tab}) failed: {ex.Message}");
+            }
+
+            // "keine Objekte" for an empty tab (Danijel's option 2), a real count when we
+            // have one, only the tab name when the count could not be read.
+            string text = !countReadable
+                ? Settings.Loc.Get("InvTabNoCount", name)
+                : count == 0
+                    ? Settings.Loc.Get("InvTabEmpty", name)
+                    : Settings.Loc.Get(count == 1 ? "InvTabWithCountOne" : "InvTabWithCount", name, count);
+            if (!string.IsNullOrEmpty(firstItem))
+            {
+                text += Settings.Loc.Get("InvTabFirstItem", firstItem);
+            }
+            return text;
+        }
+
+        /// <summary>
+        /// Ctrl+Tab / Ctrl+Shift+Tab: cycle the inventory tabs (Tools, Clothes, Pawnables,
+        /// Reading) with wrap-around. The game's tab buttons are mouse-only, so without
+        /// this key every item outside the currently shown tab is simply unreachable for
+        /// a keyboard player (bug #55: "my gloves and tape reel are gone").
+        ///
+        /// IMPORTANT - which tab API is the real one: the game ships TWO inventory UI
+        /// systems. PageSystemInventoryTabPanel (DiscoPages) is DEAD CODE on PC -
+        /// FindObjectOfType returns null even with the inventory wide open (verified
+        /// live 17.07.2026; same finding as the ScreenAnnouncer counter bug). The PC
+        /// inventory is driven by Il2CppSunshine.InventoryManager: CurrentTab (int,
+        /// writable) plus UpdateCurrentlySelectedTab(), which repaints the panel and -
+        /// through our existing Harmony patch on it - triggers the OnTabChanged
+        /// announcement. So this method only writes the game's own state and pokes the
+        /// game's own refresh; no UI simulation anywhere.
+        /// </summary>
+        public void SwitchTab(bool backward)
+        {
+            try
+            {
+                // Singleton exists for the whole session; the VIEW gate (is the inventory
+                // actually open?) sits in InputManager, not here. So a null manager with
+                // the inventory OPEN is an internal error - the message says
+                // "unavailable", not "open the inventory first" (which would be wrong
+                // advice in the only state this line can play; PR review cleanup).
+                var manager = Il2CppSunshine.InventoryManager.Singleton;
+                if (manager == null)
+                {
+                    MelonLogger.Warning("[Inventory] SwitchTab: InventoryManager.Singleton is null with the inventory open");
+                    TolkScreenReader.Instance.Speak(Settings.Loc.Get("InvTabUnavailable"), true);
+                    return;
+                }
+
+                // Tab indices count along TabOrder (the panel's left-to-right order).
+                // Adding (length - 1) instead of subtracting 1 keeps the modulo positive.
+                int tabCount = TabOrder.Length;
+                int next = (manager.CurrentTab + (backward ? tabCount - 1 : 1)) % tabCount;
+
+                manager.CurrentTab = next;
+                // Arm the one-shot suppression BEFORE the refresh below: the game's
+                // auto-select of the new tab's first item fires inside
+                // UpdateCurrentlySelectedTab, and its OnSelect announcement must stay
+                // silent (the tab announcement already carries the item's name).
+                ArmTabSwitchSuppression();
+                // The game's own refresh: repaints the grid for the new tab and fires our
+                // UpdateCurrentlySelectedTab patch, which announces "Tab Kleidung: 4
+                // Gegenstände. Ausgewählt: ..." - so there is no separate announcement here.
+                manager.UpdateCurrentlySelectedTab();
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error switching inventory tab: {ex}");
+            }
+        }
+
+        /// <summary>True while the inventory screen is the current view - the tab keys only make sense there.</summary>
+        public static bool IsInventoryViewOpen
+        {
+            get
+            {
+                try
+                {
+                    var view = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                    if (view == null) return false;
+                    var type = view.GetViewType();
+                    return type == Il2CppSunshine.Views.ViewType.INVENTORY
+                        || type == Il2CppSunshine.Views.ViewType.INVENTORY_PAWN;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// True while the PAWN SHOP variant of the inventory is the current view (it has
+        /// no tabs; everything sits in the PAWNABLES group). Same single source of truth
+        /// as IsInventoryViewOpen.
+        /// </summary>
+        public static bool IsPawnShopOpen
+        {
+            get
+            {
+                try
+                {
+                    var view = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                    return view != null
+                        && view.GetViewType() == Il2CppSunshine.Views.ViewType.INVENTORY_PAWN;
+                }
+                catch
+                {
+                    return false;
+                }
             }
         }
 

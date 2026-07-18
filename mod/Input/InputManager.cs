@@ -62,6 +62,25 @@ namespace AccessibilityMod.Input
                 return;
             }
 
+            // Thought splash exit (bug #57b). The research-result splash is modal, its
+            // close button is mouse-only, and NOTHING else closes it from the keyboard -
+            // physical Enter, EventSystem submit and a synthetic click all bounced off in
+            // live testing (17.07.2026). This check must run FIRST (PR review findings
+            // 2+4): before the dialogue gate, because the splash can open while
+            // IsConversationActive is still true (Disco runs many interactions as
+            // conversations) and the player must never be trapped without a keyboard
+            // exit - and before the interact dispatch below, because otherwise the
+            // interact key would first start an autowalk to some world object behind
+            // the modal and only then close the splash.
+            if (KeyBindings.IsPressed(GameKey.CloseSplash)
+                || KeyBindings.IsPressed(GameKey.InteractWithSelected))
+            {
+                if (TryCloseThoughtSplash())
+                {
+                    return; // the key was consumed by the splash - don't also interact
+                }
+            }
+
             // On-demand current selection announcement
             if (KeyBindings.IsPressed(GameKey.AnnounceCurrentSelection))
             {
@@ -216,6 +235,34 @@ namespace AccessibilityMod.Input
                 navigationSystem.StopMovement();
             }
 
+            // Inventory tab switching (Ctrl+Tab / Ctrl+Shift+Tab). Both share the Tab base
+            // key and IsPressed tolerates extra modifiers, so the Shift variant must be
+            // checked first. Only acts while the inventory screen is actually open.
+            if (KeyBindings.IsPressed(GameKey.InventoryPrevTab))
+            {
+                if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+                    Inventory.InventoryNavigationHandler.Instance.SwitchTab(backward: true);
+            }
+            else if (KeyBindings.IsPressed(GameKey.InventoryNextTab))
+            {
+                if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+                    Inventory.InventoryNavigationHandler.Instance.SwitchTab(backward: false);
+            }
+
+            // Healing keys (Ctrl+H health, Shift+H morale - digits are off limits, the
+            // game reads them in dialogue regardless of Ctrl; see KeyBindings). Both
+            // share base key H with the plain-H status announcement, which yields to
+            // them in HandleDialogSafeKeys (specific-binding-first rule). The else-if
+            // also breaks the Ctrl+Shift+H tie in favour of health.
+            if (KeyBindings.IsPressed(GameKey.HealHealth))
+            {
+                Patches.HealingKeyActions.HealHealth();
+            }
+            else if (KeyBindings.IsPressed(GameKey.HealMorale))
+            {
+                Patches.HealingKeyActions.HealMorale();
+            }
+
             HandleDialogSafeKeys();
 
             // Handle Thought Cabinet specific input
@@ -223,6 +270,84 @@ namespace AccessibilityMod.Input
         }
 
         private float lastDialogBlockHint;
+
+        /// <summary>
+        /// Closes the thought-research splash if it is the current view. Returns true
+        /// when the splash was there (and the close request was sent), false when there
+        /// is no splash - so the caller knows whether the key press is consumed.
+        /// </summary>
+        private static bool TryCloseThoughtSplash()
+        {
+            try
+            {
+                var view = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                if (view == null || view.GetViewType() != Il2CppSunshine.Views.ViewType.THOUGHTSPLASHSCREEN)
+                {
+                    return false;
+                }
+
+                var splash = view.TryCast<Il2CppSunshine.Views.ThoughtSplashScreenView>();
+                if (splash == null) return false;
+
+                // Two steps, both needed (all single-call paths failed live 17.07.2026:
+                // physical Enter, EventSystem submit, synthetic click and Escape all
+                // bounce off; OnControllerButtonToClosePressed NREs without a gamepad):
+                //  1. SetThoughtStateAndGoBack = the accept bookkeeping (fixes the
+                //     completed thought into its slot, same as the mouse accept).
+                //     Despite the name, its "go back" does NOT change the view.
+                //  2. SwitchToView(CLEAR) = actually leave the modal - the one exit
+                //     that verifiably works without a mouse.
+                try
+                {
+                    // The accept bookkeeping: whatever the game wired onto its close
+                    // button (SetThoughtStateAndGoBack is private and NOT exposed by the
+                    // interop assembly, so the button's own click event is the way in).
+                    splash.buttonClose?.onClick?.Invoke();
+                }
+                catch (System.Exception inner)
+                {
+                    // Bookkeeping failed (no project set, artificial states, ...) - the
+                    // exit below must still run so the player is NEVER trapped.
+                    MelonLogger.Warning($"[THOUGHT] buttonClose invoke failed: {inner.Message}");
+                }
+
+                // Only FORCE the exit if the button's own handler did not already leave
+                // the splash. Live-verified, the button click alone keeps the view on the
+                // splash (that is why the forced switch exists) - but if a future/other
+                // flow (e.g. the splash opened from inside the thought cabinet) navigates
+                // back on its own, forcing CLEAR here would override that and eject the
+                // player to gameplay. So: re-check the view, and only push CLEAR if we are
+                // still stuck on the splash.
+                var after = Il2CppSunshine.Views.ViewController.GetCurrentView();
+                if (after == null || after.GetViewType() != Il2CppSunshine.Views.ViewType.THOUGHTSPLASHSCREEN)
+                {
+                    // The button's own close already took us somewhere - leave it be.
+                    MelonLogger.Msg("[THOUGHT] Splash closed by its own button");
+                    return true;
+                }
+
+                // Still on the splash: force the exit through the ViewController INSTANCE,
+                // exactly like the dev bridge's working "view CLEAR" command. Calling
+                // View.SwitchToView(ViewType) on the splash itself does nothing - that is
+                // the callback the controller fires, not the initiator.
+                var controller = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Views.ViewController>();
+                var clearView = controller?.GetViewByType(Il2CppSunshine.Views.ViewType.CLEAR);
+                if (controller == null || clearView == null)
+                {
+                    MelonLogger.Warning("[THOUGHT] ViewController/CLEAR view not found - cannot close splash");
+                    return true; // key consumed anyway; better silent than a stray interact
+                }
+                controller.SwitchToView(clearView, false, false,
+                    Il2CppSunshine.Views.VIEW_STACK_OPERATION.STACK_PREVIOUS);
+                MelonLogger.Msg("[THOUGHT] Splash closed via keyboard");
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Error($"Error closing thought splash: {ex}");
+                return false;
+            }
+        }
 
         /// <summary>True when a key was pressed whose action is suppressed while the dialogue UI is up.</summary>
         private bool IsAnyWorldNavigationKeyPressed() =>
@@ -233,7 +358,11 @@ namespace AccessibilityMod.Input
             || KeyBindings.IsPressed(GameKey.NavigateToSelected) || KeyBindings.IsPressed(GameKey.InteractWithSelected)
             || KeyBindings.IsPressed(GameKey.CreateWaypoint) || KeyBindings.IsPressed(GameKey.FocusWaypoints)
             || KeyBindings.IsPressed(GameKey.DeleteWaypoint) || KeyBindings.IsPressed(GameKey.ToggleSortingMode)
-            || KeyBindings.IsPressed(GameKey.ScanSceneByDistance);
+            || KeyBindings.IsPressed(GameKey.ScanSceneByDistance)
+            // Healing is world-only too (the HUD with its plus buttons is gone during
+            // dialogue) - listing it here gives a blocked Ctrl+H/Shift+H the same spoken
+            // "in dialogue" hint instead of silence.
+            || KeyBindings.IsPressed(GameKey.HealHealth) || KeyBindings.IsPressed(GameKey.HealMorale);
 
         /// <summary>
         /// Keys that make sense both in the world and while the dialogue UI is up:
@@ -266,8 +395,14 @@ namespace AccessibilityMod.Input
                 OrbTextVocalizationPatches.ToggleOrbAnnouncements();
             }
 
-            // Character status announcement
-            if (KeyBindings.IsPressed(GameKey.AnnounceStatus))
+            // Character status announcement. Plain H shares its base key with the two
+            // healing chords (Ctrl+H / Shift+H) and IsPressed tolerates extra held
+            // modifiers - so status only speaks when NO healing binding matches,
+            // otherwise one keypress would heal AND announce (specific-binding-first
+            // rule, same convention as the other shared-base-key chains).
+            if (KeyBindings.IsPressed(GameKey.AnnounceStatus)
+                && !KeyBindings.IsPressed(GameKey.HealHealth)
+                && !KeyBindings.IsPressed(GameKey.HealMorale))
             {
                 Patches.CharacterStatusAnnouncement.AnnounceFullStatus();
             }
@@ -391,6 +526,45 @@ namespace AccessibilityMod.Input
                 if (eventSystem != null)
                 {
                     var currentSelection = eventSystem.currentSelectedGameObject;
+
+                    // In the inventory the focused object is usually an InventoryHighlighter
+                    // slot, which the GENERIC UI formatter cannot read - only the inventory
+                    // path can. Without this, pressing "announce current selection" over an
+                    // item said "Current selection has no text" and, being interrupting,
+                    // beheaded the tab/count announcement (bug #2). Try the inventory
+                    // resolver first whenever the inventory screen is open. Its three-way
+                    // answer routes three ways (PR review finding 6, Jana's decision):
+                    //   text  -> a real item / equipment slot: read it.
+                    //   ""    -> an EMPTY grid slot: say where we are (tab + count).
+                    //   null  -> NOT an inventory slot (a button, a header): fall through
+                    //            to the generic UI reader below, which knows how to read
+                    //            it - the tab summary would describe the wrong thing.
+                    if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+                    {
+                        string itemText = currentSelection == null
+                            ? null
+                            : Patches.InventoryHighlighterHelper.GetSelectionText(currentSelection);
+
+                        if (!string.IsNullOrEmpty(itemText))
+                        {
+                            TolkScreenReader.Instance.Speak(itemText, true);
+                            MelonLogger.Msg($"[ON-DEMAND] Inventory selection: {itemText}");
+                            return;
+                        }
+
+                        if (itemText == "" || currentSelection == null)
+                        {
+                            // Empty grid slot / nothing focused yet: say where we are, and
+                            // do it NON-interrupting (Danijel's option 2) so it never cuts
+                            // off the tab announcement. "keine Objekte" when the tab is
+                            // empty.
+                            TolkScreenReader.Instance.Speak(
+                                Inventory.InventoryNavigationHandler.DescribeCurrentTab(), false);
+                            return;
+                        }
+                        // itemText == null with a focused object: not ours - fall through.
+                    }
+
                     if (currentSelection != null)
                     {
                         string speechText = UIElementFormatter.FormatUIElementForSpeech(currentSelection);
