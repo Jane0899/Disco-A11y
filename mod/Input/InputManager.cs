@@ -226,7 +226,21 @@ namespace AccessibilityMod.Input
             }
             else if (KeyBindings.IsPressed(GameKey.InteractWithSelected))
             {
-                navigationSystem.InteractWithSelectedObject();
+                // Inside the inventory, "interact" means the focused SLOT, not whatever
+                // object the world-navigation system last selected (that selection is
+                // meaningless with a full-screen UI covering the game view). This is
+                // what makes a Reading-tab item's own "look at it more closely" hint
+                // reachable at all (user question 19.07.2026) - the game has no click
+                // action wired to Enter/Submit for these slots, only to a real pointer
+                // click, which ActivateSelectedSlot fires directly.
+                if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+                {
+                    Patches.InventoryHighlighterHelper.ActivateSelectedSlot();
+                }
+                else
+                {
+                    navigationSystem.InteractWithSelectedObject();
+                }
             }
 
             // Stop automated movement

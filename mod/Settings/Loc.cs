@@ -215,6 +215,11 @@ namespace AccessibilityMod.Settings
             ["InvSlotEmpty"] = (
                 "empty",
                 "leer"),
+            // The interact key on a focused inventory slot without a clickable Button
+            // (e.g. an empty grid cell) - feedback so the key never feels dead.
+            ["ItemNoAction"] = (
+                "Nothing to activate here.",
+                "Hier gibt es nichts zu aktivieren."),
             // The healing plus buttons (mouse-only in the game).
             ["HealedHealth"] = (
                 "Health restored. {0} health charges left.",

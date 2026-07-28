@@ -624,7 +624,33 @@ namespace DevBridge
                     sb.AppendLine($"active InventoryHighlighter slots: {active}");
                     sb.Append(uiSb);
                     var es2 = UnityEngine.EventSystems.EventSystem.current;
-                    sb.AppendLine($"EventSystem selection: {(es2?.currentSelectedGameObject == null ? "(none)" : es2.currentSelectedGameObject.name)}");
+                    var selectedGo = es2?.currentSelectedGameObject;
+                    sb.AppendLine($"EventSystem selection: {(selectedGo == null ? "(none)" : selectedGo.name)}");
+
+                    // Ground-truth for Jana's "Reading tab item, Enter/F does nothing"
+                    // question (19.07.2026): what actually SITS on the selected slot and
+                    // can receive a click, since InventoryHighlighter itself only
+                    // implements hover/select, not click (confirmed by reading its
+                    // decompiled source - no OnPointerClick/OnSubmit there at all).
+                    if (selectedGo != null)
+                    {
+                        var sel = selectedGo.GetComponent<UnityEngine.UI.Selectable>();
+                        sb.AppendLine($"selected slot Selectable: {(sel == null ? "none" : sel.GetIl2CppType().FullName)}");
+                        var asButton = sel?.TryCast<UnityEngine.UI.Button>();
+                        if (asButton != null)
+                        {
+                            sb.AppendLine($"  is a Button, onClick persistent listeners: {asButton.onClick.GetPersistentEventCount()}");
+                        }
+                        var legacySlot = selectedGo.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
+                        sb.AppendLine($"legacy InventoryItemSlot component present: {legacySlot != null}");
+                        var allComponents = selectedGo.GetComponents<UnityEngine.Component>();
+                        sb.AppendLine("all components on selected slot:");
+                        foreach (var c in allComponents)
+                        {
+                            if (c == null) continue;
+                            sb.AppendLine($"  {c.GetIl2CppType().FullName}");
+                        }
+                    }
                     return sb.ToString().TrimEnd();
                 }
 

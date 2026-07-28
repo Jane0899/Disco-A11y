@@ -254,6 +254,56 @@ namespace AccessibilityMod.Patches
             return !string.IsNullOrEmpty(equipped) ? equipped : GetSlotAnnouncement(go.name);
         }
 
+        /// <summary>
+        /// Fires the currently focused inventory slot's own click action - the keyboard
+        /// equivalent of clicking it with the mouse. This is what a Reading-tab item's
+        /// own flavor text means by "look at it more closely" (user question
+        /// 19.07.2026): Enter/F previously did nothing there because
+        /// Il2Cpp.InventoryHighlighter - the component our navigation already tracks -
+        /// only implements hover/select (verified against its decompiled source: no
+        /// OnPointerClick, no OnSubmit at all). The actual click lives on a sibling
+        /// UnityEngine.UI.Button, confirmed live via the dev bridge's "inventory"
+        /// component dump. Calling the button's OWN OnPointerClick is a normal method
+        /// call through the real UI object - the same technique
+        /// MapNavigationHandler.TravelToSelected already uses for the quicktravel
+        /// buttons - NOT a Harmony patch on a virtual method (that crashes the game for
+        /// Il2Cpp types, see ThoughtCabinetNavigationHandler's ThoughtSlot.OnSelect
+        /// note), so every game rule the mouse click would trigger (equip, examine
+        /// conversation, whatever the game itself wired to this specific item) still
+        /// applies exactly as it would for a sighted player.
+        /// </summary>
+        public static void ActivateSelectedSlot()
+        {
+            try
+            {
+                var selected = EventSystem.current?.currentSelectedGameObject;
+                if (selected == null)
+                {
+                    TolkScreenReader.Instance.Speak(Settings.Loc.Get("ItemNoSelection"), true);
+                    return;
+                }
+
+                var button = selected.GetComponent<UnityEngine.UI.Button>();
+                if (button == null || !button.interactable)
+                {
+                    // An empty grid slot (or anything else without a Button) never had a
+                    // click action to begin with - say so rather than staying silent,
+                    // same "every keypress gets feedback" rule as the rest of the
+                    // inventory navigation.
+                    TolkScreenReader.Instance.Speak(Settings.Loc.Get("ItemNoAction"), true);
+                    return;
+                }
+
+                var pointer = new PointerEventData(EventSystem.current);
+                button.OnPointerClick(pointer);
+                MelonLogger.Msg($"[Inventory] Activated slot: {selected.name}");
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error activating inventory slot: {ex}");
+            }
+        }
+
 
         public static string GetEquippedItemName(string slotName)
         {
