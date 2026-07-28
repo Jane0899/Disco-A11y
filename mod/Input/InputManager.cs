@@ -93,6 +93,8 @@ namespace AccessibilityMod.Input
             // active; a blocked key speaks a hint instead of silently doing nothing.
             if (DialogStateManager.IsDialogUiActive)
             {
+                EnsureDialogResponseSelected();
+
                 if (IsAnyWorldNavigationKeyPressed()
                     && UnityEngine.Time.unscaledTime - lastDialogBlockHint > 3f)
                 {
@@ -350,6 +352,46 @@ namespace AccessibilityMod.Input
             {
                 MelonLogger.Error($"Error closing thought splash: {ex}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Safety net for a rare but confirmed freeze (Jana, 19.07.2026): a modal
+        /// notification (the game's own "MORAL KRITISCH! HEILE DICH SOFORT!" popped up
+        /// mid-conversation, ~9 s gap in the dialogue log where nothing advanced) can
+        /// apparently clear the EventSystem's selected object without the dialogue
+        /// system reclaiming it afterward - Enter (Unity's Submit) then does nothing
+        /// because nothing is selected to submit to. The player happened to unstick it
+        /// by opening the game's own Inventory (I, not one of our keys) - that forces a
+        /// fresh EventSystem selection elsewhere and back, which is exactly what this
+        /// makes automatic instead of accidental. Cheap: FindObjectsOfType only runs on
+        /// the rare frame where the selection is already gone (a plain null/inactive
+        /// check otherwise), not every frame the dialogue is open.
+        /// </summary>
+        private static void EnsureDialogResponseSelected()
+        {
+            try
+            {
+                var eventSystem = EventSystem.current;
+                if (eventSystem == null) return;
+
+                var current = eventSystem.currentSelectedGameObject;
+                if (current != null && current.activeInHierarchy) return; // selection is fine
+
+                var buttons = UnityEngine.Object.FindObjectsOfType<Il2Cpp.SunshineResponseButton>();
+                foreach (var button in buttons)
+                {
+                    if (button != null && button.gameObject.activeInHierarchy)
+                    {
+                        eventSystem.SetSelectedGameObject(button.gameObject);
+                        MelonLogger.Msg("[DIALOG] Restored lost EventSystem selection to a response button");
+                        break;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"[DIALOG] EnsureDialogResponseSelected failed: {ex.Message}");
             }
         }
 
