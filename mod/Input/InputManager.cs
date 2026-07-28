@@ -501,6 +501,33 @@ namespace AccessibilityMod.Input
 
         private void DescribeSelectedItem()
         {
+            // In the inventory, "the selected item" means whatever slot is currently
+            // highlighted (arrow-key focus) - GetCurrentSelectedObject below only
+            // tracks the WORLD-navigation selection and would describe a stale,
+            // unrelated object (or nothing) while the player is browsing the
+            // inventory. This is what makes a Reading-tab document's text reachable
+            // at all: the game itself shows it only as a mouse-hover tooltip, no
+            // click/interact action exists for it (user question 19.07.2026 - Enter
+            // did nothing on a book because there genuinely is no such action; this
+            // key is the keyboard equivalent of hovering). GetSelectionText already
+            // carries the item's full description for real items and equipped slots
+            // (via FormatInventoryItemForSpeech) - same text already spoken on
+            // arrow-select, but an explicit key press must repeat it on demand
+            // regardless of the OnSelect dedup window (same "explicit request is
+            // never suppressed" convention as RepeatDialogue/DescribeArea).
+            if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
+            {
+                var currentSelection = EventSystem.current?.currentSelectedGameObject;
+                string itemText = currentSelection == null
+                    ? null
+                    : Patches.InventoryHighlighterHelper.GetSelectionText(currentSelection);
+
+                TolkScreenReader.Instance.Speak(
+                    string.IsNullOrEmpty(itemText) ? Loc.Get("ItemNoSelection") : itemText,
+                    true);
+                return;
+            }
+
             var selected = navigationSystem.StateManager.GetCurrentSelectedObject();
             if (selected == null)
             {
