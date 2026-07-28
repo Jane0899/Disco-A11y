@@ -263,19 +263,9 @@ namespace AccessibilityMod.Input
                     Inventory.InventoryNavigationHandler.Instance.SwitchTab(backward: false);
             }
 
-            // Healing keys (Ctrl+H health, Shift+H morale - digits are off limits, the
-            // game reads them in dialogue regardless of Ctrl; see KeyBindings). Both
-            // share base key H with the plain-H status announcement, which yields to
-            // them in HandleDialogSafeKeys (specific-binding-first rule). The else-if
-            // also breaks the Ctrl+Shift+H tie in favour of health.
-            if (KeyBindings.IsPressed(GameKey.HealHealth))
-            {
-                Patches.HealingKeyActions.HealHealth();
-            }
-            else if (KeyBindings.IsPressed(GameKey.HealMorale))
-            {
-                Patches.HealingKeyActions.HealMorale();
-            }
+            // Healing keys live in HandleDialogSafeKeys (below) so they also work while
+            // a conversation is up - the game itself expects that (see the comment on
+            // IsAnyWorldNavigationKeyPressed).
 
             HandleDialogSafeKeys();
 
@@ -372,11 +362,14 @@ namespace AccessibilityMod.Input
             || KeyBindings.IsPressed(GameKey.NavigateToSelected) || KeyBindings.IsPressed(GameKey.InteractWithSelected)
             || KeyBindings.IsPressed(GameKey.CreateWaypoint) || KeyBindings.IsPressed(GameKey.FocusWaypoints)
             || KeyBindings.IsPressed(GameKey.DeleteWaypoint) || KeyBindings.IsPressed(GameKey.ToggleSortingMode)
-            || KeyBindings.IsPressed(GameKey.ScanSceneByDistance)
-            // Healing is world-only too (the HUD with its plus buttons is gone during
-            // dialogue) - listing it here gives a blocked Ctrl+H/Shift+H the same spoken
-            // "in dialogue" hint instead of silence.
-            || KeyBindings.IsPressed(GameKey.HealHealth) || KeyBindings.IsPressed(GameKey.HealMorale);
+            || KeyBindings.IsPressed(GameKey.ScanSceneByDistance);
+            // Healing is NOT listed here (bug, Jana 19.07.2026): the health/morale bars
+            // and their plus buttons stay up during dialogue - proven by the game's own
+            // "MORAL KRITISCH! HEILE DICH SOFORT!" notification firing mid-conversation,
+            // which would make no sense if healing were physically impossible right
+            // then. The earlier assumption ("HUD is gone during dialogue") was wrong and
+            // cost a real player a morale point they had no way to prevent. Healing is
+            // handled in HandleDialogSafeKeys instead, so it works in both contexts.
 
         /// <summary>
         /// Keys that make sense both in the world and while the dialogue UI is up:
@@ -384,6 +377,24 @@ namespace AccessibilityMod.Input
         /// </summary>
         private void HandleDialogSafeKeys()
         {
+            // Healing keys (Ctrl+H health, Shift+H morale - digits are off limits, the
+            // game reads them in dialogue regardless of Ctrl; see KeyBindings). Checked
+            // FIRST and unconditionally here - in the world AND during a conversation -
+            // because the health/morale HUD stays up and clickable throughout a dialogue
+            // (confirmed by the game's own "MORAL KRITISCH! HEILE DICH SOFORT!"
+            // notification firing mid-conversation; a player who could not act on it
+            // lost a morale point for nothing, 19.07.2026). The else-if breaks the
+            // Ctrl+Shift+H tie in favour of health; the AnnounceStatus check below
+            // yields to both via its own guard (specific-binding-first rule).
+            if (KeyBindings.IsPressed(GameKey.HealHealth))
+            {
+                Patches.HealingKeyActions.HealHealth();
+            }
+            else if (KeyBindings.IsPressed(GameKey.HealMorale))
+            {
+                Patches.HealingKeyActions.HealMorale();
+            }
+
             // Toggle dialog reading mode
             if (KeyBindings.IsPressed(GameKey.ToggleDialogReading))
             {
