@@ -255,22 +255,28 @@ namespace AccessibilityMod.Patches
         }
 
         /// <summary>
-        /// Fires the currently focused inventory slot's own click action - the keyboard
-        /// equivalent of clicking it with the mouse. This is what a Reading-tab item's
-        /// own flavor text means by "look at it more closely" (user question
-        /// 19.07.2026): Enter/F previously did nothing there because
-        /// Il2Cpp.InventoryHighlighter - the component our navigation already tracks -
-        /// only implements hover/select (verified against its decompiled source: no
-        /// OnPointerClick, no OnSubmit at all). The actual click lives on a sibling
-        /// UnityEngine.UI.Button, confirmed live via the dev bridge's "inventory"
-        /// component dump. Calling the button's OWN OnPointerClick is a normal method
-        /// call through the real UI object - the same technique
-        /// MapNavigationHandler.TravelToSelected already uses for the quicktravel
-        /// buttons - NOT a Harmony patch on a virtual method (that crashes the game for
-        /// Il2Cpp types, see ThoughtCabinetNavigationHandler's ThoughtSlot.OnSelect
-        /// note), so every game rule the mouse click would trigger (equip, examine
-        /// conversation, whatever the game itself wired to this specific item) still
-        /// applies exactly as it would for a sighted player.
+        /// Fires the currently focused inventory item's own "activate" action (what a
+        /// mouse click on the tooltip's own button would do). Two dead ends before this,
+        /// both confirmed live via the dev bridge (19.07.2026) rather than guessed:
+        ///  1. UnityEngine.UI.Button.OnPointerClick on the grid slot itself - built,
+        ///     deployed, tested: nothing happened. Bridge diagnostic showed why - that
+        ///     Button has ZERO onClick listeners on every slot, grid and equipment alike.
+        ///  2. The slot's sibling Sunshine.UIDragDock.OnSubmit() - built, deployed,
+        ///     tested: ran without error (confirmed in MelonLoader's log), but produced
+        ///     no observable game reaction either - view stayed on INVENTORY, on-screen
+        ///     text unchanged.
+        /// The bridge's "screen" dump (all visible on-screen text) while sitting on the
+        /// item revealed the real target: a literal "[Interact Button] INTERAGIEREN"
+        /// entry - a SEPARATE UI element belonging to Sunshine.InventoryTooltip, not the
+        /// grid slot at all. InventoryTooltip.interactButton is a real Button wired up
+        /// by the game's own PrimeConversation() whenever the item has a `conversation`
+        /// set (Disco Elysium's dialogue-tree mechanism) - exactly what a Reading-tab
+        /// item's "look at it more closely" flavor text is pointing at. Calling its
+        /// OnPointerClick is a normal method call through the real UI object (not a
+        /// Harmony patch on a virtual method - that crashes the game for Il2Cpp types,
+        /// see ThoughtCabinetNavigationHandler's ThoughtSlot.OnSelect note). UIDragDock
+        /// and the plain Button stay as fallbacks for slot kinds where the tooltip's
+        /// interact button isn't showing (belt and suspenders, costs nothing).
         /// </summary>
         public static void ActivateSelectedSlot()
         {
@@ -283,24 +289,42 @@ namespace AccessibilityMod.Patches
                     return;
                 }
 
-                var button = selected.GetComponent<UnityEngine.UI.Button>();
-                if (button == null || !button.interactable)
+                var tooltip = InventoryTooltip.Singleton;
+                var interactButton = tooltip?.interactButton;
+                if (interactButton != null && interactButton.gameObject.activeInHierarchy && interactButton.interactable)
                 {
-                    // An empty grid slot (or anything else without a Button) never had a
-                    // click action to begin with - say so rather than staying silent,
-                    // same "every keypress gets feedback" rule as the rest of the
-                    // inventory navigation.
-                    TolkScreenReader.Instance.Speak(Settings.Loc.Get("ItemNoAction"), true);
+                    var tooltipPointer = new PointerEventData(EventSystem.current);
+                    interactButton.OnPointerClick(tooltipPointer);
+                    MelonLogger.Msg($"[Inventory] Activated via InventoryTooltip.interactButton for: {selected.name}");
                     return;
                 }
 
-                var pointer = new PointerEventData(EventSystem.current);
-                button.OnPointerClick(pointer);
-                MelonLogger.Msg($"[Inventory] Activated slot: {selected.name}");
+                var dragDock = selected.GetComponent<Il2CppSunshine.UIDragDock>();
+                if (dragDock != null)
+                {
+                    dragDock.OnSubmit();
+                    MelonLogger.Msg($"[Inventory] Activated slot via UIDragDock.OnSubmit: {selected.name}");
+                    return;
+                }
+
+                var button = selected.GetComponent<UnityEngine.UI.Button>();
+                if (button != null && button.interactable)
+                {
+                    var pointer = new PointerEventData(EventSystem.current);
+                    button.OnPointerClick(pointer);
+                    MelonLogger.Msg($"[Inventory] Activated slot via Button.OnPointerClick: {selected.name}");
+                    return;
+                }
+
+                // Nothing present/interactable (e.g. an empty grid slot never had an
+                // action to begin with) - say so rather than staying silent, same "every
+                // keypress gets feedback" rule as the rest of the inventory navigation.
+                TolkScreenReader.Instance.Speak(Settings.Loc.Get("ItemNoAction"), true);
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Error activating inventory slot: {ex}");
+                TolkScreenReader.Instance.Speak(Settings.Loc.Get("ItemActivateError"), true);
             }
         }
 
