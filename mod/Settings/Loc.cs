@@ -220,6 +220,11 @@ namespace AccessibilityMod.Settings
             ["ItemNoAction"] = (
                 "Nothing to activate here.",
                 "Hier gibt es nichts zu aktivieren."),
+            // Exception while activating a slot (UIDragDock.OnSubmit or the Button
+            // fallback threw) - an explicit user action must never fail silently.
+            ["ItemActivateError"] = (
+                "Error activating this item.",
+                "Fehler beim Aktivieren dieses Gegenstands."),
             // The healing plus buttons (mouse-only in the game).
             ["HealedHealth"] = (
                 "Health restored. {0} health charges left.",
