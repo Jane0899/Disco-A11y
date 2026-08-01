@@ -289,6 +289,20 @@ namespace AccessibilityMod.Patches
                     return;
                 }
 
+                // The game itself already ships a keyboard path for this: TooltipSource
+                // (sits on every slot alongside InventoryHighlighter) has ShowTooltip(bool
+                // setByKeyboard), separate from the mouse-only OnPointerEnter/OnPointerExit
+                // on the same component. Keyboard selection (OnSelect) never calls it, so
+                // InventoryTooltip.interactButton stays unpopulated for a keyboard-only
+                // player - confirmed live: F on the case-file/ledger's equipment slot fell
+                // through to the wrong UIDragDock.OnSubmit path (a drag-drop confirm with
+                // no keyboard meaning at all, not the game's Submit action - it takes no
+                // event data, so it can't be an ISubmitHandler) and silently did nothing.
+                // Calling ShowTooltip(true) here mirrors what a mouse hover does, for grid
+                // slots too (already working there via a different path, so harmless).
+                var tooltipSource = selected.GetComponent<Il2CppSunshine.TooltipSource>();
+                tooltipSource?.ShowTooltip(true);
+
                 var tooltip = InventoryTooltip.Singleton;
                 var interactButton = tooltip?.interactButton;
                 if (interactButton != null && interactButton.gameObject.activeInHierarchy && interactButton.interactable)

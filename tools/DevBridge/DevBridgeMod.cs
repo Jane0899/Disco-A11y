@@ -327,6 +327,8 @@ namespace DevBridge
                            "modkey <GameKey> | modkeys (fire one of the mod's own hotkeys)\n" +
                            "select npcs|locations|loot|all | cycle [back] | category next|prev\n" +
                            "navigate | interact | stop | announce\n" +
+                           "buttons | click <label> | selectui <label> (like click, but sets EventSystem focus instead of firing onClick)\n" +
+                           "ui down|up|left|right|submit|cancel | inspect (drive/inspect the currently selected UI element)\n" +
                            "dialog | continue\n" +
                            "teleport <x> <y> <z> | goto <scene> <marker> | scenes\n" +
                            "destinations | travel <destinationId> | view [type]\n" +
@@ -845,6 +847,83 @@ namespace DevBridge
                         }
                     }
                     return $"no button matching '{needle}'";
+                }
+
+                // Directly calls the same method the mod's own InteractWithSelected key
+                // calls once IsInventoryViewOpen is true (InputManager.cs). 'modkey
+                // InteractWithSelected' cannot be used for this: InputManager checks that
+                // GameKey twice per Update (once for the thought-splash-close guard, once
+                // for the real dispatch), and the bridge's key injection is consumed by the
+                // first check that reads it - a real keypress stays "down" for the whole
+                // frame so this never affects a real player, only bridge-simulated keys
+                // that get checked more than once per frame.
+                case "activateslot":
+                    InventoryHighlighterHelper.ActivateSelectedSlot();
+                    return "ActivateSelectedSlot() called directly";
+
+                // Diagnostic for the case-file/ledger "F does nothing" puzzle (31.07.2026):
+                // dumps InventoryTooltip.interactButton state, calls InventoryHighlighter.
+                // OnPointerEnter directly (bypassing ExecuteEvents entirely, in case IL2CPP
+                // interop doesn't resolve the interface for Execute<IPointerEnterHandler>),
+                // then dumps the tooltip state again to see whether that's what populates it.
+                case "tooltipdiag":
+                {
+                    var es = UnityEngine.EventSystems.EventSystem.current;
+                    var sel = es?.currentSelectedGameObject;
+                    if (sel == null) return "(nothing selected)";
+
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"selected: {sel.name}");
+
+                    var tt = Il2CppSunshine.InventoryTooltip.Singleton;
+                    sb.AppendLine($"InventoryTooltip.Singleton: {(tt == null ? "null" : "present")}");
+                    var before = tt?.interactButton;
+                    sb.AppendLine($"interactButton BEFORE: {(before == null ? "null" : $"active={before.gameObject.activeInHierarchy} interactable={before.interactable}")}");
+
+                    // Not on the slot GameObject itself (confirmed via 'inventory' dump -
+                    // only RectTransform/Button/UIDragDock/InventoryHighlighter there), so
+                    // search the hierarchy: parents first (wrapper container is the more
+                    // common Unity pattern), then children.
+                    var tooltipSource = sel.GetComponentInParent<Il2CppSunshine.TooltipSource>()
+                        ?? sel.GetComponentInChildren<Il2CppSunshine.TooltipSource>();
+                    sb.AppendLine($"TooltipSource (parent-or-child search): {(tooltipSource == null ? "null" : tooltipSource.gameObject.name)}");
+                    if (tooltipSource != null)
+                    {
+                        tooltipSource.ShowTooltip(true);
+                        sb.AppendLine("called ShowTooltip(true)");
+                    }
+
+                    var tt2 = Il2CppSunshine.InventoryTooltip.Singleton;
+                    var after = tt2?.interactButton;
+                    sb.AppendLine($"interactButton AFTER: {(after == null ? "null" : $"active={after.gameObject.activeInHierarchy} interactable={after.interactable}")}");
+                    return sb.ToString().TrimEnd();
+                }
+
+                // Sets real EventSystem focus on a Selectable by (child-text or GameObject)
+                // name, same lookup as 'click' but calling SetSelectedGameObject instead of
+                // onClick.Invoke(). Needed because 'click' only fires the UnityEvent - a real
+                // mouse click also runs Selectable.OnPointerDown, which is what actually
+                // calls EventSystem.current.SetSelectedGameObject and makes the game populate
+                // its selection-dependent UI (e.g. InventoryTooltip.interactButton). Without
+                // this, elements that are reachable only by name (not by keyboard tab order,
+                // e.g. the equipment paperdoll slots - no GameKey moves focus there) can never
+                // be put into the state ActivateSelectedSlot expects.
+                case "selectui":
+                {
+                    if (parts.Length < 2) return "usage: selectui <selectable label or GameObject-name substring>";
+                    var needle = string.Join(" ", parts.Skip(1)).ToLowerInvariant();
+                    foreach (var s in UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.Selectable>())
+                    {
+                        if (s == null || !s.gameObject.activeInHierarchy || !s.interactable) continue;
+                        var label = s.GetComponentInChildren<Il2CppTMPro.TextMeshProUGUI>();
+                        var text = label != null && !string.IsNullOrWhiteSpace(label.text) ? label.text.Trim() : s.gameObject.name;
+                        if (text.ToLowerInvariant().Contains(needle) || s.gameObject.name.ToLowerInvariant().Contains(needle))
+                        {
+                            UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(s.gameObject);
+                            return $"selected: {s.gameObject.name} (label: {text})";
+                        }
+                    }
+                    return $"no selectable matching '{needle}'";
                 }
 
                 case "dialog":
