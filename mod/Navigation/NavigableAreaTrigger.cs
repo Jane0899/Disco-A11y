@@ -25,11 +25,13 @@ namespace AccessibilityMod.Navigation
         public readonly Il2Cpp.InteractionAreaTrigger Trigger;
         public readonly string Name;
         public readonly Vector3 Position;
+        public readonly Quaternion Rotation;
 
         public NavigableAreaTrigger(Il2Cpp.InteractionAreaTrigger trigger)
         {
             Trigger = trigger;
             Position = trigger.transform.position;
+            Rotation = trigger.transform.rotation;
 
             // These triggers were never meant to be named out loud - there is no display
             // name field at all (conversationIfNoEntity is an internal conversation ID, not

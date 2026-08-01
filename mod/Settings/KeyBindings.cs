@@ -150,6 +150,13 @@ namespace AccessibilityMod.Settings
             // (SplashCloseHint) renders the LIVE binding via SpeakableName, never a
             // hardcoded key name.
             [GameKey.CloseSplash] = new KeyBinding(KeyCode.Return),
+
+            // Shift+PageUp/PageDown: free in this preset (Page Up/Down are not used for
+            // anything else here - Defaults keeps cycling on Period/Shift+Period instead),
+            // and matches the physical key the other two presets use for the same action,
+            // so the hint stays findable regardless of active preset.
+            [GameKey.CycleApproachSideForward] = new KeyBinding(KeyCode.PageDown, requireShift: true),
+            [GameKey.CycleApproachSideBackward] = new KeyBinding(KeyCode.PageUp, requireShift: true),
         };
 
         /// <summary>
@@ -225,6 +232,8 @@ namespace AccessibilityMod.Settings
             [GameKey.HealHealth] = new KeyBinding(KeyCode.H, requireCtrl: true),
             [GameKey.HealMorale] = new KeyBinding(KeyCode.H, requireShift: true),
             [GameKey.CloseSplash] = new KeyBinding(KeyCode.Return),
+            [GameKey.CycleApproachSideForward] = new KeyBinding(KeyCode.PageDown, requireShift: true),
+            [GameKey.CycleApproachSideBackward] = new KeyBinding(KeyCode.PageUp, requireShift: true),
         };
 
         /// <summary>

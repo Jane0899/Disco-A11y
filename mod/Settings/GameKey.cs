@@ -77,5 +77,15 @@ namespace AccessibilityMod.Settings
         /// mouse-only). Was hardcoded Enter at first - made remappable because EVERY mod
         /// hotkey must be a GameKey, visible to the configurator (PR review finding 10).</summary>
         CloseSplash,
+
+        /// <summary>Cycles which side of the selected object "navigate to" walks you to
+        /// (front/right/back/left, relative to the object's own facing) - some objects only
+        /// react correctly from one particular side (e.g. a car's headlights only illuminate
+        /// what is in front of it, not beside it), and the default "closest reachable point"
+        /// pick is not always that side. Jana's idea, 01.08.2026 (see todos.md J7).</summary>
+        CycleApproachSideForward,
+
+        /// <summary>Previous approach side (see CycleApproachSideForward).</summary>
+        CycleApproachSideBackward,
     }
 }

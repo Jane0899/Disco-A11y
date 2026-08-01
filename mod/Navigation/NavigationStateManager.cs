@@ -28,6 +28,16 @@ namespace AccessibilityMod.Navigation
         private List<NavigableAreaTrigger> areaTriggers = new List<NavigableAreaTrigger>();
         private ObjectCategory currentCategory = ObjectCategory.NPCs;
         private int selectedObjectIndex = -1;
+
+        // Which side of the selected object "navigate to" walks you to (Jana's idea,
+        // 01.08.2026, see todos.md J7): the default single interaction point some objects
+        // expose is not always the side that matters - a car's headlights only illuminate
+        // what is in front of it, not what is beside it. 0 = unchanged default behaviour
+        // (the object's own closest reachable point); resets on every new selection so an
+        // old side choice never silently carries over onto a different object.
+        private int approachSideIndex = 0;
+        private static readonly string[] ApproachSideNames = { "the default side", "the front", "the right side", "the back", "the left side" };
+        public string CurrentApproachSideName => ApproachSideNames[approachSideIndex];
         private SortingMode currentSortingMode = SortingMode.Directional;
 
         public ObjectCategory CurrentCategory => currentCategory;
@@ -192,6 +202,7 @@ namespace AccessibilityMod.Navigation
                 // Switch to selected category and reset selection
                 currentCategory = targetCategory;
                 selectedObjectIndex = HasObjectsInCategory(targetCategory) ? 0 : -1;
+                approachSideIndex = 0;
             }
             catch (Exception ex)
             {
@@ -269,6 +280,7 @@ namespace AccessibilityMod.Navigation
             int total = GetObjectCountForCategory(currentCategory);
             if (total == 0) return;
             selectedObjectIndex = (selectedObjectIndex + 1) % total;
+            approachSideIndex = 0;
         }
 
         public void CycleToPreviousObject()
@@ -276,6 +288,46 @@ namespace AccessibilityMod.Navigation
             int total = GetObjectCountForCategory(currentCategory);
             if (total == 0) return;
             selectedObjectIndex = (selectedObjectIndex - 1 + total) % total;
+            approachSideIndex = 0;
+        }
+
+        /// <summary>Cycles which side of the current selection "navigate to" targets - see
+        /// the approachSideIndex field comment. Does nothing without a selection.</summary>
+        public void CycleApproachSide(bool backward)
+        {
+            if (!HasSelection && GetCurrentSelectedAreaTrigger() == null) return;
+            int count = ApproachSideNames.Length;
+            approachSideIndex = (approachSideIndex + (backward ? -1 : 1) + count) % count;
+        }
+
+        /// <summary>
+        /// Null means "unchanged": approachSideIndex is still 0 (the player has never
+        /// cycled sides for this selection, or explicitly cycled back to the default), so
+        /// callers should keep using the object's own normal interaction point. Non-null is
+        /// an approximate stand-here point (fixed radius, since we have no collider bounds
+        /// to work with generically) offset from the object's own facing direction - "front"
+        /// means whatever the object's local +Z axis points at, which is the closest
+        /// generic proxy for "front" any GameObject has.
+        /// </summary>
+        public Vector3? GetApproachOverridePosition(Vector3 objectPosition, Quaternion objectRotation)
+        {
+            if (approachSideIndex == 0) return null;
+
+            // 5.5m: originally 1.5m (a "just beside the object" guess), widened after live
+            // testing against the Kineema's actual "halogen watermarks" reveal trigger sat
+            // 5.6m from the car's own transform - object-relative approach points are not
+            // necessarily close to the object itself. Still a rough generic default, not
+            // tuned per object (see NavigableAreaTrigger.cs for why: no per-object hack).
+            const float APPROACH_RADIUS_METERS = 5.5f;
+            Vector3 localDirection = approachSideIndex switch
+            {
+                1 => Vector3.forward,
+                2 => Vector3.right,
+                3 => Vector3.back,
+                4 => Vector3.left,
+                _ => Vector3.zero
+            };
+            return objectPosition + (objectRotation * localDirection) * APPROACH_RADIUS_METERS;
         }
 
         public int GetObjectCountForCategory(ObjectCategory category)

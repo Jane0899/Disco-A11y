@@ -949,6 +949,20 @@ namespace DevBridge
                     return $"teleported to {target.x:F2} {target.y:F2} {target.z:F2}";
                 }
 
+                // Unlike teleport (instant transform.position set, which may not reliably
+                // fire Unity trigger-collider OnTriggerEnter/Stay the way an actual walked
+                // path does), this uses the mod's own real pathfinding/movement so physics
+                // trigger detection behaves exactly as it would for a player who walked
+                // there (J7, 02.08.2026 - testing whether "halogen watermarks" needs a real
+                // walk-in, not just standing at the right coordinates).
+                case "walkto":
+                {
+                    if (parts.Length < 4) return "usage: walkto <x> <y> <z>";
+                    var target = new Vector3(float.Parse(parts[1]), float.Parse(parts[2]), float.Parse(parts[3]));
+                    nav.MovementController.TryNavigateToPosition(target, "test position");
+                    return $"walking to {target.x:F2} {target.y:F2} {target.z:F2}";
+                }
+
                 case "quickload":
                 case "loadnewest":
                 {
@@ -1128,6 +1142,90 @@ namespace DevBridge
                         default:
                             return "usage: trace on|off|tail [n]|holders";
                     }
+                }
+
+                // J7 (todos.md): finds the actual trigger for a position-gated reveal (the
+                // Kineema headlight/ledger-signature "thought bubble") that isn't reachable
+                // through the normal object-interact system. Two candidate sources near the
+                // selected object (or player, if nothing is selected): Light components
+                // (the headlight beam itself is the most likely position source for a
+                // "stand in the light" check) and trigger colliders (isTrigger=true only -
+                // solid colliders are walls/ground/props, not reveal zones, so filtering to
+                // triggers cuts the usual noise of a cluttered scene down to plausible hits).
+                case "nearbylights":
+                {
+                    Vector3 center;
+                    var sel = nav?.StateManager?.GetCurrentSelectedObject();
+                    if (parts.Length > 1 && float.TryParse(parts[1], out _))
+                    {
+                        center = GameObjectUtils.GetPlayerPosition();
+                    }
+                    else if (sel != null)
+                    {
+                        center = sel.transform.position;
+                    }
+                    else
+                    {
+                        center = GameObjectUtils.GetPlayerPosition();
+                    }
+                    float radius = (parts.Length > 1 && float.TryParse(parts[1], out var r)) ? r : 15f;
+
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"center: {center} (radius {radius}m)");
+
+                    sb.AppendLine("--- Lights ---");
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<UnityEngine.Light>(true))
+                    {
+                        if (light == null) continue;
+                        float d = UnityEngine.Vector3.Distance(center, light.transform.position);
+                        if (d > radius) continue;
+                        sb.AppendLine($"  '{light.gameObject.name}' type={light.type} range={light.range:F1} intensity={light.intensity:F1} active={light.gameObject.activeInHierarchy} at {d:F1}m, pos={light.transform.position}");
+                    }
+
+                    sb.AppendLine("--- Trigger colliders ---");
+                    foreach (var col in UnityEngine.Object.FindObjectsOfType<UnityEngine.Collider>(true))
+                    {
+                        if (col == null || !col.isTrigger) continue;
+                        // bounds.center, not transform.position: a SphereCollider/BoxCollider
+                        // can have a local "center" offset from its transform, and the AABB
+                        // center is the only value that accounts for it - transform.position
+                        // alone can be several metres off the actual trigger volume.
+                        var trueCenter = col.bounds.center;
+                        float d = UnityEngine.Vector3.Distance(center, trueCenter);
+                        if (d > radius) continue;
+                        sb.AppendLine($"  '{col.gameObject.name}' type={col.GetIl2CppType().Name} active={col.gameObject.activeInHierarchy} at {d:F1}m, transform.pos={col.transform.position}, bounds.center={trueCenter}, bounds.size={col.bounds.size}");
+                    }
+
+                    return sb.ToString().TrimEnd();
+                }
+
+                // TEST-ONLY diagnostic (J7, 02.08.2026): force a named Light active/on with
+                // nonzero intensity, to check whether "stand in the halogen watermarks zone"
+                // alone is enough once the headlights are actually lit, without first
+                // needing to find/unlock whatever real story flag normally turns them on.
+                // Never a real fix - just answers one yes/no question fast.
+                case "forcelight":
+                {
+                    if (parts.Length < 2) return "usage: forcelight <name substring>";
+                    var needle = string.Join(" ", parts.Skip(1)).ToLowerInvariant();
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<UnityEngine.Light>(true))
+                    {
+                        if (light == null || !light.gameObject.name.ToLowerInvariant().Contains(needle)) continue;
+
+                        // SetActive(true) on the light's own GameObject is not enough if a
+                        // PARENT is disabled - activeInHierarchy stays false either way, so
+                        // walk up and enable every ancestor too.
+                        var t = light.transform;
+                        while (t != null)
+                        {
+                            if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
+                            t = t.parent;
+                        }
+                        light.enabled = true;
+                        light.intensity = light.intensity > 0.01f ? light.intensity : 5f;
+                        return $"forced on: '{light.gameObject.name}' active={light.gameObject.activeInHierarchy} intensity={light.intensity}";
+                    }
+                    return $"no light matching '{needle}'";
                 }
 
                 // Runs the mod's reachability check on the selected object, step by step,

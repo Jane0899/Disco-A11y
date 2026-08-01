@@ -186,12 +186,20 @@ namespace AccessibilityMod.Input
                     navigationSystem.SelectCategory(ObjectCategory.Everything);
             }
 
-            // Cycle categories / objects. All four share base keys in the layout-safe
-            // presets (PageUp/PageDown with and without Ctrl) and KeyBindings.IsPressed
-            // tolerates extra modifiers, so the more specific bindings (more required
-            // modifiers: Ctrl category cycling, Shift backward-cycling) must be checked
-            // before the plain ones in one else-if chain.
-            if (KeyBindings.IsPressed(GameKey.CycleCategoryBackward))
+            // Cycle categories / objects / approach sides. All six share base keys in the
+            // layout-safe presets (PageUp/PageDown with Ctrl, Shift, or nothing) and
+            // KeyBindings.IsPressed tolerates extra modifiers, so the more specific
+            // bindings (more required modifiers: Ctrl category cycling, Shift approach-side
+            // cycling) must be checked before the plain ones in one else-if chain.
+            if (KeyBindings.IsPressed(GameKey.CycleApproachSideBackward))
+            {
+                navigationSystem.CycleApproachSide(backward: true);
+            }
+            else if (KeyBindings.IsPressed(GameKey.CycleApproachSideForward))
+            {
+                navigationSystem.CycleApproachSide(backward: false);
+            }
+            else if (KeyBindings.IsPressed(GameKey.CycleCategoryBackward))
             {
                 navigationSystem.CycleCategory(backward: true);
             }
@@ -404,7 +412,8 @@ namespace AccessibilityMod.Input
             || KeyBindings.IsPressed(GameKey.NavigateToSelected) || KeyBindings.IsPressed(GameKey.InteractWithSelected)
             || KeyBindings.IsPressed(GameKey.CreateWaypoint) || KeyBindings.IsPressed(GameKey.FocusWaypoints)
             || KeyBindings.IsPressed(GameKey.DeleteWaypoint) || KeyBindings.IsPressed(GameKey.ToggleSortingMode)
-            || KeyBindings.IsPressed(GameKey.ScanSceneByDistance);
+            || KeyBindings.IsPressed(GameKey.ScanSceneByDistance)
+            || KeyBindings.IsPressed(GameKey.CycleApproachSideForward) || KeyBindings.IsPressed(GameKey.CycleApproachSideBackward);
             // Healing is NOT listed here (bug, Jana 19.07.2026): the health/morale bars
             // and their plus buttons stay up during dialogue - proven by the game's own
             // "MORAL KRITISCH! HEILE DICH SOFORT!" notification firing mid-conversation,
