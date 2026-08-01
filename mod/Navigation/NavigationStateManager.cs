@@ -18,6 +18,14 @@ namespace AccessibilityMod.Navigation
     public class NavigationStateManager
     {
         private Dictionary<ObjectCategory, List<MouseOverHighlight>> categorizedObjects = new Dictionary<ObjectCategory, List<MouseOverHighlight>>();
+
+        // Invisible walk-in trigger zones (Il2Cpp.InteractionAreaTrigger with no backing
+        // world object - see NavigableAreaTrigger.cs) that MouseOverHighlight.registry
+        // simply does not contain. Only ever populated for ObjectCategory.Everything -
+        // appended AFTER the normal list in the selection index space, so
+        // selectedObjectIndex in [0, categorizedObjects[Everything].Count) means a normal
+        // object as always, and [that .. +areaTriggers.Count) means one of these instead.
+        private List<NavigableAreaTrigger> areaTriggers = new List<NavigableAreaTrigger>();
         private ObjectCategory currentCategory = ObjectCategory.NPCs;
         private int selectedObjectIndex = -1;
         private SortingMode currentSortingMode = SortingMode.Directional;
@@ -67,9 +75,39 @@ namespace AccessibilityMod.Navigation
                         // Add to Everything category regardless of what it is
                         categorizedObjects[ObjectCategory.Everything].Add(obj);
                     }
+
+                    // Pure walk-in trigger zones (no basicEntity - see NavigableAreaTrigger.cs)
+                    // are invisible to MouseOverHighlight.registry above, so they need their
+                    // own scan. Ones WITH a basicEntity already have a normal representation
+                    // in the loop above (that's what basicEntity IS - a reference to the real
+                    // object), so only the entity-less ones are new information here.
+                    areaTriggers.Clear();
+                    // includeInactive: true - these are one-off "walk in and see this" zones,
+                    // commonly left disabled until a story/inventory condition turns them on
+                    // (confirmed live: the default FindObjectsOfType<T>() overload, which
+                    // skips inactive GameObjects, found zero of them in a scene that clearly
+                    // has some). A disabled trigger still correctly means "not available yet"
+                    // for us too - the two checks below already filter to what is currently
+                    // relevant (distance, reachability); an inactive one that is also out of
+                    // range is simply never added, no different from never being found here.
+                    var allTriggers = UnityEngine.Object.FindObjectsOfType<Il2Cpp.InteractionAreaTrigger>(true);
+                    int skippedHasEntity = 0, skippedTooFar = 0, skippedUnreachable = 0;
+                    foreach (var trigger in allTriggers)
+                    {
+                        if (trigger == null || trigger.gameObject == null) continue;
+                        if (trigger.basicEntity != null) { skippedHasEntity++; continue; }
+
+                        float distance = Vector3.Distance(playerPos, trigger.transform.position);
+                        if (distance > maxDistance) { skippedTooFar++; continue; }
+                        if (ReachabilityChecker.IsReachable(playerPos, trigger.transform.position) == false) { skippedUnreachable++; continue; }
+
+                        areaTriggers.Add(new NavigableAreaTrigger(trigger));
+                    }
+                    MelonLoader.MelonLogger.Msg($"[NAVIGATION STATE] Area triggers: {allTriggers.Length} total in scene, {skippedHasEntity} have basicEntity, {skippedTooFar} too far, {skippedUnreachable} unreachable, {areaTriggers.Count} added");
                 }
                 else
                 {
+                    areaTriggers.Clear();
                     // Normal categorization for specific categories
                     foreach (var obj in registry)
                     {
@@ -128,6 +166,29 @@ namespace AccessibilityMod.Navigation
                     }
                 }
                 
+                // Same sort as the normal list above, kept as a second block since
+                // NavigableAreaTrigger isn't a MouseOverHighlight and can't share that loop.
+                if (currentSortingMode == SortingMode.Directional)
+                {
+                    areaTriggers.Sort((a, b) =>
+                    {
+                        float weightedDistA = DirectionCalculator.CalculateReachabilityWeightedDistance(playerPos, a.Position);
+                        float weightedDistB = DirectionCalculator.CalculateReachabilityWeightedDistance(playerPos, b.Position);
+                        int rangeA = (int)(weightedDistA / 10);
+                        int rangeB = (int)(weightedDistB / 10);
+                        if (rangeA != rangeB) return rangeA.CompareTo(rangeB);
+                        float angleA = DirectionCalculator.GetAngleToTarget(playerPos, a.Position);
+                        float angleB = DirectionCalculator.GetAngleToTarget(playerPos, b.Position);
+                        return angleA.CompareTo(angleB);
+                    });
+                }
+                else
+                {
+                    areaTriggers.Sort((a, b) =>
+                        DirectionCalculator.CalculateReachabilityWeightedDistance(playerPos, a.Position)
+                        .CompareTo(DirectionCalculator.CalculateReachabilityWeightedDistance(playerPos, b.Position)));
+                }
+
                 // Switch to selected category and reset selection
                 currentCategory = targetCategory;
                 selectedObjectIndex = HasObjectsInCategory(targetCategory) ? 0 : -1;
@@ -141,11 +202,27 @@ namespace AccessibilityMod.Navigation
         public MouseOverHighlight GetCurrentSelectedObject()
         {
             if (!HasSelection) return null;
-            
+
             var objects = categorizedObjects[currentCategory];
             if (selectedObjectIndex >= objects.Count) return null;
-            
+
             return objects[selectedObjectIndex];
+        }
+
+        /// <summary>
+        /// The area-trigger counterpart to GetCurrentSelectedObject() - non-null exactly
+        /// when selectedObjectIndex has walked past the normal object list and into the
+        /// appended trigger-zone range (Everything category only, see the areaTriggers field).
+        /// </summary>
+        public NavigableAreaTrigger GetCurrentSelectedAreaTrigger()
+        {
+            if (currentCategory != ObjectCategory.Everything) return null;
+
+            int normalCount = categorizedObjects.TryGetValue(currentCategory, out var normalList) ? normalList.Count : 0;
+            int triggerIndex = selectedObjectIndex - normalCount;
+            if (triggerIndex < 0 || triggerIndex >= areaTriggers.Count) return null;
+
+            return areaTriggers[triggerIndex];
         }
 
         private float lastScanTime;
@@ -186,23 +263,26 @@ namespace AccessibilityMod.Navigation
 
         public void CycleToNextObject()
         {
-            if (!HasObjectsInCategory(currentCategory)) return;
-
-            var objects = categorizedObjects[currentCategory];
-            selectedObjectIndex = (selectedObjectIndex + 1) % objects.Count;
+            // Combined count (normal objects + trigger zones for Everything) - cycling
+            // past the last normal object walks straight into the trigger zones instead
+            // of wrapping early, and back again past the last trigger zone.
+            int total = GetObjectCountForCategory(currentCategory);
+            if (total == 0) return;
+            selectedObjectIndex = (selectedObjectIndex + 1) % total;
         }
 
         public void CycleToPreviousObject()
         {
-            if (!HasObjectsInCategory(currentCategory)) return;
-
-            var objects = categorizedObjects[currentCategory];
-            selectedObjectIndex = (selectedObjectIndex - 1 + objects.Count) % objects.Count;
+            int total = GetObjectCountForCategory(currentCategory);
+            if (total == 0) return;
+            selectedObjectIndex = (selectedObjectIndex - 1 + total) % total;
         }
 
         public int GetObjectCountForCategory(ObjectCategory category)
         {
-            return categorizedObjects.ContainsKey(category) ? categorizedObjects[category].Count : 0;
+            int normal = categorizedObjects.ContainsKey(category) ? categorizedObjects[category].Count : 0;
+            int triggers = category == ObjectCategory.Everything ? areaTriggers.Count : 0;
+            return normal + triggers;
         }
 
         public bool HasObjectsInCategory(ObjectCategory category)
@@ -263,6 +343,27 @@ namespace AccessibilityMod.Navigation
 
         public NavigationInfo GetCurrentNavigationInfo(Vector3 playerPos)
         {
+            // Checked before the normal object, not after: GetCurrentSelectedObject()
+            // legitimately returns null once selectedObjectIndex has walked into the
+            // trigger-zone range, which must not be reported as "nothing selected".
+            var areaTrigger = GetCurrentSelectedAreaTrigger();
+            if (areaTrigger != null)
+            {
+                float triggerDistance = Vector3.Distance(playerPos, areaTrigger.Position);
+                return new NavigationInfo
+                {
+                    HasSelection = true,
+                    ObjectName = areaTrigger.Name,
+                    Distance = triggerDistance,
+                    Direction = DirectionCalculator.GetCardinalDirection(playerPos, areaTrigger.Position),
+                    CurrentIndex = selectedObjectIndex + 1,
+                    TotalCount = GetObjectCountForCategory(currentCategory),
+                    CategoryName = ObjectCategorizer.GetCategoryDisplayName(currentCategory),
+                    SortingMode = currentSortingMode,
+                    IsReachable = ReachabilityChecker.IsReachable(playerPos, areaTrigger.Position)
+                };
+            }
+
             var selectedObj = GetCurrentSelectedObject();
             if (selectedObj == null)
             {

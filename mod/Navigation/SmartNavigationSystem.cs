@@ -487,6 +487,19 @@ namespace AccessibilityMod.Navigation
 
             try
             {
+                // Trigger zones (NavigableAreaTrigger) have no interaction radius, no
+                // click handler, no "walk there first" concept - just Interact(). Firing
+                // it directly regardless of distance IS the accessible equivalent of
+                // physically walking into an invisible zone's exact bounds, which has no
+                // accessible equivalent otherwise (see todos.md J7).
+                var areaTrigger = stateManager.GetCurrentSelectedAreaTrigger();
+                if (areaTrigger != null)
+                {
+                    MelonLogger.Msg($"[SMART NAV] Interacting with area trigger: {areaTrigger.Name}");
+                    areaTrigger.Interact();
+                    return;
+                }
+
                 var selectedObject = stateManager.GetCurrentSelectedObject();
                 if (selectedObject == null)
                 {
@@ -592,15 +605,26 @@ namespace AccessibilityMod.Navigation
                     return;
                 }
 
-                var selectedObject = stateManager.GetCurrentSelectedObject();
-                if (selectedObject == null || selectedObject.transform == null)
+                var areaTrigger = stateManager.GetCurrentSelectedAreaTrigger();
+                Vector3 destination;
+                string objectName;
+                if (areaTrigger != null)
                 {
-                    TolkScreenReader.Instance.Speak($"No object selected. Select a category first, then use {KeyBindings.SpeakableName(GameKey.CycleForward)} to cycle.", true);
-                    return;
+                    destination = areaTrigger.Position;
+                    objectName = areaTrigger.Name;
                 }
+                else
+                {
+                    var selectedObject = stateManager.GetCurrentSelectedObject();
+                    if (selectedObject == null || selectedObject.transform == null)
+                    {
+                        TolkScreenReader.Instance.Speak($"No object selected. Select a category first, then use {KeyBindings.SpeakableName(GameKey.CycleForward)} to cycle.", true);
+                        return;
+                    }
 
-                Vector3 destination = selectedObject.transform.position;
-                string objectName = ObjectNameCleaner.GetBetterObjectName(selectedObject);
+                    destination = selectedObject.transform.position;
+                    objectName = ObjectNameCleaner.GetBetterObjectName(selectedObject);
+                }
 
                 MelonLogger.Msg($"[SMART NAV] Attempting to navigate to {objectName}");
                 TolkScreenReader.Instance.Speak($"Calculating path to {objectName}...", true);
