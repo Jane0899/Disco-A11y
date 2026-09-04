@@ -69,7 +69,22 @@ namespace AccessibilityMod
                 TolkScreenReader.Instance.Speak(
                     Loc.Get("AreaEntered", areaName), false, AnnouncementCategory.Queueable);
             }
-            SpeakAreaDescription();
+            // Areas entered while a conversation is running would be talked straight over:
+            // the description starts the moment the scene changes, the dialogue keeps going,
+            // and both land on the screen reader at once. Dream sequences are the extreme
+            // case - they ALWAYS begin inside a dialogue (you fall asleep mid-conversation),
+            // so their description would never once be heard cleanly. Deferring it to the
+            // moment the player actually has control is what the long introduction already
+            // does; the short description now waits for the same signal. Keyed off the live
+            // dialogue state, never off scene names, so it holds for every area equally.
+            if (UI.DialogStateManager.IsDialogUiActive)
+            {
+                pendingDescriptionScene = sceneName;
+            }
+            else
+            {
+                SpeakAreaDescription();
+            }
 
             // First time ever in this area: queue the long introduction. It is not spoken
             // here but once the player actually has control (dialogue over) - waking up in
@@ -83,6 +98,34 @@ namespace AccessibilityMod
         }
 
         private string pendingIntroScene;
+        private string pendingDescriptionScene;
+
+        /// <summary>
+        /// Speaks a description that was held back because the player entered the area
+        /// mid-conversation (see AnnounceAreaIfChanged). Same "wait for control" rule as
+        /// the introduction, and deliberately spoken BEFORE it: short first ("what does it
+        /// look like"), long second ("where am I, actually") - the order a player gets on a
+        /// normal, dialogue-free entry.
+        /// </summary>
+        private void SpeakPendingDescriptionIfReady()
+        {
+            if (pendingDescriptionScene == null) return;
+            if (UI.DialogStateManager.IsDialogUiActive) return;
+
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (scene != pendingDescriptionScene)
+            {
+                // Already left again before it was ever spoken - describing the room you
+                // just walked out of is worse than staying quiet. The repeat-suppression
+                // bookkeeping in SpeakAreaDescription was never touched, so the area still
+                // describes itself normally on the next entry.
+                pendingDescriptionScene = null;
+                return;
+            }
+
+            pendingDescriptionScene = null;
+            SpeakAreaDescription();
+        }
 
         /// <summary>
         /// Speaks the pending first-visit introduction the moment the player can act on
@@ -318,6 +361,7 @@ namespace AccessibilityMod
                 TutorialGuide.Update();
 
                 AnnounceAreaIfChanged();
+                SpeakPendingDescriptionIfReady();
                 SpeakPendingIntroIfReady();
 
                 Patches.ContainerPatches.Update();
