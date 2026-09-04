@@ -225,6 +225,15 @@ namespace AccessibilityMod.Settings
             ["ItemActivateError"] = (
                 "Error activating this item.",
                 "Fehler beim Aktivieren dieses Gegenstands."),
+            // The item has no equipment slot at all (pawn goods, books, the map...):
+            // the game's own equip path does nothing for it and says nothing either,
+            // which is indistinguishable from a broken key for a blind player
+            // (Jana, 04.09.2026: "Warum kann ich die Pfandsachen nicht in die Hand
+            // nehmen?"). A successful equip already announces itself via the game's
+            // DockItem patch, so this completes the pair: something is always said.
+            ["ItemNotEquippable"] = (
+                "{0} cannot be equipped.",
+                "{0} lässt sich nicht anlegen."),
             // The healing plus buttons (mouse-only in the game).
             ["HealedHealth"] = (
                 "Health restored. {0} health charges left.",

@@ -215,6 +215,63 @@ namespace AccessibilityMod.Patches
     public static class InventoryHighlighterHelper
     {
         /// <summary>
+        /// The spoken refusal for an item that has no equipment slot at all, or null when
+        /// the item either IS equippable or we simply cannot tell.
+        ///
+        /// The game decides this purely by ItemType: HELD goes in a hand, SHIRT/JACKET/
+        /// COAT/PANTS/NECK/GLASSES/GLOVES/HAT/SHOES/ARMOR go on the body, and anything
+        /// else has no slot - pawn goods, books, the map, the tape spools. The inventory
+        /// TAB an item sits in says nothing about this (a "pawnable" is a group, not a
+        /// type), which is exactly why it looks arbitrary from the outside.
+        ///
+        /// Deliberately a POSITIVE whitelist rather than "== NONE": live data shows real
+        /// items carrying a type value that our decompiled ItemType enum does not even
+        /// name (it stops at NONE), so testing for the known-equippable values is the only
+        /// test that stays correct when the enum has more members than we can see.
+        /// Anything we cannot resolve returns null and stays silent - a wrong "cannot be
+        /// equipped" on an item that actually equips would be worse than no message.
+        /// </summary>
+        private static string DescribeIfNotEquippable(GameObject go)
+        {
+            try
+            {
+                if (go == null) return null;
+
+                var slot = go.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>()
+                           ?? go.GetComponentInChildren<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
+                var item = slot?.item;
+                if (item == null) return null; // empty cell, equipment slot, or not resolvable
+
+                switch (item.type)
+                {
+                    case Il2Cpp.ItemType.HELD:
+                    case Il2Cpp.ItemType.ARMOR:
+                    case Il2Cpp.ItemType.SHIRT:
+                    case Il2Cpp.ItemType.JACKET:
+                    case Il2Cpp.ItemType.COAT:
+                    case Il2Cpp.ItemType.PANTS:
+                    case Il2Cpp.ItemType.NECK:
+                    case Il2Cpp.ItemType.GLASSES:
+                    case Il2Cpp.ItemType.GLOVES:
+                    case Il2Cpp.ItemType.HAT:
+                    case Il2Cpp.ItemType.SHOES:
+                        return null; // has a slot - the equip attempt is legitimate
+                }
+
+                string name = !string.IsNullOrEmpty(item.displayName)
+                    ? RTLHelper.FixForScreenReader(item.displayName)
+                    : RTLHelper.FixForScreenReader(slot.itemName ?? "");
+                return Settings.Loc.Get("ItemNotEquippable", name);
+            }
+            catch (Exception ex)
+            {
+                // Never let a diagnostic message break the activation itself.
+                MelonLogger.Warning($"[Inventory] DescribeIfNotEquippable failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// The item text for a selected inventory GameObject, or null if the object is
         /// not an inventory slot at all (so the caller can fall through to other UI).
         /// Shared by the OnSelect announcement and the on-demand "announce current
@@ -331,8 +388,23 @@ namespace AccessibilityMod.Patches
                 var dragDock = selected.GetComponent<Il2CppSunshine.UIDragDock>();
                 if (dragDock != null)
                 {
+                    // This same call is what successfully equips a prybar or a flashlight,
+                    // so it always runs - but for an item with no equipment slot at all it
+                    // does nothing AND says nothing, which a blind player cannot tell apart
+                    // from a dead key (Jana, 04.09.2026: "why can't I put the pawn items in
+                    // my hand?"). A successful equip already announces itself through the
+                    // game's own DockItem patch above, so the only missing half is the
+                    // refusal - say it, with the item's name, and let the call proceed
+                    // regardless in case the game does something else with it.
+                    string notEquippable = DescribeIfNotEquippable(selected);
+
                     dragDock.OnSubmit();
                     MelonLogger.Msg($"[Inventory] Activated slot via UIDragDock.OnSubmit: {selected.name}");
+
+                    if (notEquippable != null)
+                    {
+                        TolkScreenReader.Instance.Speak(notEquippable, true);
+                    }
                     return;
                 }
 
