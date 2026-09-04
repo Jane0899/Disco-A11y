@@ -300,10 +300,25 @@ namespace AccessibilityMod.Patches
                 // event data, so it can't be an ISubmitHandler) and silently did nothing.
                 // Calling ShowTooltip(true) here mirrors what a mouse hover does, for grid
                 // slots too (already working there via a different path, so harmless).
-                var tooltipSource = selected.GetComponent<Il2CppSunshine.TooltipSource>();
+                // Ownership check, the same one GetSelectionText uses: only a real
+                // inventory slot carries an InventoryHighlighter. It matters because
+                // InventoryTooltip is a SINGLETON belonging to whichever item was last
+                // shown - it is not tied to the current keyboard focus, and Unity tooltips
+                // follow hover, not focus. Without this guard, moving focus on to a plain
+                // button (close, sort) while the previous item's tooltip is still active
+                // would make this key click the OLD item's interact button instead of the
+                // button the player is actually standing on - worst case starting a
+                // conversation instead of closing the inventory (PR review, Danijel
+                // 14.08.2026). Non-slots skip straight to the generic Button path below,
+                // which clicks exactly what is focused.
+                bool isInventorySlot = selected.GetComponent<Il2Cpp.InventoryHighlighter>() != null;
+
+                var tooltipSource = isInventorySlot
+                    ? selected.GetComponent<Il2CppSunshine.TooltipSource>()
+                    : null;
                 tooltipSource?.ShowTooltip(true);
 
-                var tooltip = InventoryTooltip.Singleton;
+                var tooltip = isInventorySlot ? InventoryTooltip.Singleton : null;
                 var interactButton = tooltip?.interactButton;
                 if (interactButton != null && interactButton.gameObject.activeInHierarchy && interactButton.interactable)
                 {
