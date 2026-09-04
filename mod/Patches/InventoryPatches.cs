@@ -289,7 +289,20 @@ namespace AccessibilityMod.Patches
                     return;
                 }
 
-                var tooltip = InventoryTooltip.Singleton;
+                // Ownership check, the same one GetSelectionText uses: only a real
+                // inventory slot carries an InventoryHighlighter. It matters here because
+                // InventoryTooltip is a SINGLETON belonging to whichever item was last
+                // shown - it is not tied to the current keyboard focus, and Unity tooltips
+                // appear and disappear on hover, not in lockstep with focus. Without this
+                // guard, moving focus on to a plain button (close, sort) while the previous
+                // item's tooltip is still active would make this key click the OLD item's
+                // interact button instead of the button the player is actually standing on -
+                // worst case starting a conversation instead of closing the inventory
+                // (PR review, Danijel 14.08.2026). Non-slots skip straight to the generic
+                // Button path below, which clicks exactly what is focused.
+                bool isInventorySlot = selected.GetComponent<Il2Cpp.InventoryHighlighter>() != null;
+
+                var tooltip = isInventorySlot ? InventoryTooltip.Singleton : null;
                 var interactButton = tooltip?.interactButton;
                 if (interactButton != null && interactButton.gameObject.activeInHierarchy && interactButton.interactable)
                 {

@@ -531,14 +531,53 @@ namespace AccessibilityMod.Input
             // never suppressed" convention as RepeatDialogue/DescribeArea).
             if (Inventory.InventoryNavigationHandler.IsInventoryViewOpen)
             {
-                var currentSelection = EventSystem.current?.currentSelectedGameObject;
-                string itemText = currentSelection == null
-                    ? null
-                    : Patches.InventoryHighlighterHelper.GetSelectionText(currentSelection);
+                // GetSelectionText answers in three values, and all three mean something
+                // different (PR review, Danijel 14.08.2026 - this branch used to collapse
+                // two of them into "nothing selected", which was wrong in BOTH cases
+                // because something was focused either way):
+                //   text -> a real item / equipment slot: read it.
+                //   ""   -> an EMPTY grid slot. It IS a slot, just empty, so say where we
+                //           are (tab + count) instead of claiming nothing is selected.
+                //   null -> NOT an inventory slot at all (a button, a header). The generic
+                //           UI reader knows how to read those; the tab summary would
+                //           describe the wrong thing.
+                // Same routing AnnounceCurrentSelection already used - the two keys now
+                // agree instead of contradicting each other over the same focused object.
+                // Wrapped because GetSelectionText walks live Il2Cpp components: the sibling
+                // activation path already guards this, and an exception here would kill the
+                // whole key instead of just this one answer (review, minor point 1).
+                try
+                {
+                    var currentSelection = EventSystem.current?.currentSelectedGameObject;
+                    string itemText = currentSelection == null
+                        ? null
+                        : Patches.InventoryHighlighterHelper.GetSelectionText(currentSelection);
 
-                TolkScreenReader.Instance.Speak(
-                    string.IsNullOrEmpty(itemText) ? Loc.Get("ItemNoSelection") : itemText,
-                    true);
+                    if (!string.IsNullOrEmpty(itemText))
+                    {
+                        TolkScreenReader.Instance.Speak(itemText, true);
+                        return;
+                    }
+
+                    if (itemText == "" || currentSelection == null)
+                    {
+                        // Non-interrupting, like the sibling: this often lands right behind
+                        // the tab announcement, and cutting that one off helps nobody.
+                        TolkScreenReader.Instance.Speak(
+                            Inventory.InventoryNavigationHandler.DescribeCurrentTab(), false);
+                        return;
+                    }
+
+                    // null with something focused: not an inventory slot - read it generically.
+                    string uiText = UIElementFormatter.FormatUIElementForSpeech(currentSelection);
+                    TolkScreenReader.Instance.Speak(
+                        string.IsNullOrEmpty(uiText) ? Loc.Get("ItemNoSelection") : uiText, true);
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLogger.Error($"Error describing inventory selection: {ex}");
+                    TolkScreenReader.Instance.Speak(Loc.Get("ItemNoSelection"), true);
+                }
                 return;
             }
 
