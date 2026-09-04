@@ -656,6 +656,66 @@ namespace DevBridge
                     return sb.ToString().TrimEnd();
                 }
 
+                // "Why can't I put this in my hand?" (Jana, 04.09.2026). An item is
+                // equippable only where its ItemType names a slot - HELD for hands, SHIRT/
+                // JACKET/... for clothing, NONE for things that go in no slot at all. The
+                // inventory TAB it sits in (ItemGroup: TOOLS, CLOTHES, PAWNABLES, READING)
+                // says nothing about that, which is exactly the confusion this answers:
+                // a pawnable is a tab, not a type. Reads the game's own item library, so
+                // this is ground truth rather than inference from the item's name.
+                // With no argument it dumps every owned item; with one it filters by
+                // substring (internal name or display name).
+                case "iteminfo":
+                {
+                    string needle = parts.Length > 1
+                        ? string.Join(" ", parts.Skip(1)).ToLowerInvariant()
+                        : null;
+
+                    var invData = Il2CppSunshine.Metric.InventoryViewData.Singleton;
+                    if (invData == null) return "InventoryViewData.Singleton is null";
+                    var library = invData.GetLibrary();
+                    if (library == null) return "item library is null";
+
+                    var sb = new StringBuilder();
+                    var tabs = invData.tabContents;
+                    if (tabs == null) return "tabContents: null";
+
+                    int shown = 0;
+                    foreach (var tab in tabs)
+                    {
+                        var slots = tab.Value;
+                        if (slots == null) continue;
+                        foreach (var slot in slots)
+                        {
+                            string rawName = slot.Value;
+                            if (string.IsNullOrEmpty(rawName)) continue;
+
+                            var item = library.GetByName(rawName);
+                            string display = item != null && !string.IsNullOrEmpty(item.displayName)
+                                ? item.displayName : rawName;
+
+                            if (needle != null
+                                && !rawName.ToLowerInvariant().Contains(needle)
+                                && !display.ToLowerInvariant().Contains(needle)) continue;
+
+                            if (item == null)
+                            {
+                                sb.AppendLine($"  {rawName} (tab {tab.Key}) - NOT FOUND in library");
+                            }
+                            else
+                            {
+                                // type == HELD is the whole answer to "can this go in a hand".
+                                bool handable = item.type == Il2Cpp.ItemType.HELD;
+                                sb.AppendLine($"  {rawName} \"{display}\" | tab(group)={item.group} | type={item.type} | hand-equippable={handable}");
+                            }
+                            shown++;
+                        }
+                    }
+
+                    if (shown == 0) return needle == null ? "no items owned" : $"no owned item matches '{needle}'";
+                    return $"{shown} item(s):\n" + sb.ToString().TrimEnd();
+                }
+
                 case "thought":
                 {
                     // Test rig for bug #57 (thought cabinet completion): "thought list"
