@@ -237,6 +237,14 @@ namespace AccessibilityMod.Patches
             {
                 if (go == null) return null;
 
+                // Not on the pawn shop screen (Jana's decision, 04.09.2026). Our
+                // IsInventoryViewOpen covers INVENTORY and INVENTORY_PAWN alike, so this
+                // code runs there too - but there the player is buying and selling, not
+                // dressing. "Cannot be equipped" would answer a question nobody asked and
+                // sound like the trade itself had failed. Silence is the honest answer
+                // until someone has actually worked out what the key does there.
+                if (InventoryNavigationHandler.IsPawnShopOpen) return null;
+
                 var slot = go.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>()
                            ?? go.GetComponentInChildren<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
                 var item = slot?.item;
