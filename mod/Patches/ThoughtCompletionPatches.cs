@@ -198,14 +198,19 @@ namespace AccessibilityMod.Patches
                 if (UnityEngine.Time.unscaledTime < nextPollTime) return;
                 nextPollTime = UnityEngine.Time.unscaledTime + POLL_SECONDS;
 
-                bool nowWaiting = CheckWaiting(out string name);
+                bool nowWaiting = CheckWaiting(out string name, out bool splashFlag, out bool freshFlag);
 
                 if (nowWaiting && !waiting)
                 {
-                    // Rising edge: a thought just finished. Log both signals side by side
-                    // - until this is confirmed in a live session, the log is how we learn
-                    // which of the two actually marks the state.
-                    MelonLogger.Msg($"[THOUGHT] Finished thought waiting for confirmation: {name ?? "(name unknown)"}");
+                    // Rising edge: a thought just finished. Log the two signals SEPARATELY,
+                    // not just the combined answer - which of them actually marks the state
+                    // is still an open question, and this line is how the next real session
+                    // settles it without anyone having to reproduce the situation on
+                    // purpose. (Baseline measured live on 25.09 with nothing waiting:
+                    // WillShowSplashScreenInstead=False, FreshCount=0, and every finished
+                    // thought fresh=False - so neither signal is stuck on by default.)
+                    MelonLogger.Msg($"[THOUGHT] Finished thought waiting for confirmation: {name ?? "(name unknown)"} "
+                                  + $"| WillShowSplashScreenInstead={splashFlag} | freshFinishedThought={freshFlag}");
                     announcementPending = true;
                 }
                 else if (!nowWaiting && waiting)
@@ -300,11 +305,12 @@ namespace AccessibilityMod.Patches
         /// block was resolved on 25.09, two thoughts sat at FIXED with nothing blocked
         /// (read live over the dev bridge).
         /// </summary>
-        private static bool CheckWaiting(out string name)
+        private static bool CheckWaiting(out string name, out bool splashPending, out bool freshFinished)
         {
             name = null;
+            freshFinished = false;
 
-            bool splashPending = false;
+            splashPending = false;
             try
             {
                 splashPending = Il2CppSunshine.ThoughtManager.WillShowSplashScreenInstead();
@@ -326,6 +332,7 @@ namespace AccessibilityMod.Patches
                     if (!p.fresh) continue;
 
                     name = p.displayName;
+                    freshFinished = true;
                     return true;
                 }
             }
