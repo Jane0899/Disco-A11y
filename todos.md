@@ -5,10 +5,38 @@
 **Laufender Arbeitsschritt: J11.** Jana hat J11 als Startpunkt gewählt, Umfang „Ansage +
 Grund bei blockierter Interaktion" (nicht: Splash selbst öffnen). Fix ist gebaut und
 committet (`7dcc43d`), **aber noch nicht live bestätigt** — Details im J11-Eintrag unten.
-Nächster Schritt: Spiel mit den neuen DLLs starten, dann per Bridge `thought pending` /
-`thought list` prüfen, welches Signal den Zustand markiert, und mit `thought fix <Name>`
-den Zustand herstellen. Spielstände sind gesichert unter
-`~/.claude/backups/disco-elysium/2026-09-25_20-09-36`.
+Spielstände sind gesichert unter `~/.claude/backups/disco-elysium/2026-09-25_20-09-36`.
+
+**WICHTIG — `thought fix` NICHT auf Janas echtem Spielstand.** Jana hat das am 25.09.
+ausdrücklich abgelehnt („Ich spiel erst mal weiter und warte, bis der Gedanke fertig
+wird"). Nur auf einer **Kopie** (`save <name>` → laden → `thought fix` → Kopie danach
+löschen, siehe [[project-savegame-copy-rule]]) und **nur mit ihrem ausdrücklichen Okay**.
+Vorsicht bei der Aussagekraft: `FixThought` setzt möglicherweise `fresh` nicht und stellt
+den Splash nicht so in die Warteschlange wie eine natürliche Fertigstellung — **nur ein
+positives Ergebnis beweist etwas**, ein negatives kann am Testweg liegen.
+
+**Prüfprotokoll beim nächsten Start (Stand `04dab2a` ist noch NIE gelaufen):**
+1. **Zuerst `MelonLoader/Latest.log` lesen.** Darf NICHT enthalten:
+   `[THOUGHT] Pending-thought watch failed, disabling` oder
+   `[THOUGHT] Could not scan thought projects`. Der Wächter schaltet sich bei der ersten
+   Ausnahme **für die ganze Sitzung** ab — und `ReadFreshCount` sowie die Koch-Momentaufnahme
+   sind bisher **nie ausgeführt worden**. Ein Fehler dort sähe von außen genau aus wie J11.
+2. **Jede Zeile `[THOUGHT] Splash announced` muss im Sekundenbereich neben einem
+   `[SCREEN] Opened: THOUGHTSPLASHSCREEN` liegen.** Geprüft ist bisher nur, dass der
+   `SetThoughtProject`-Patch *bindet*, nicht wann das Spiel ihn ruft (er war monatelang tot).
+   Feuert er, ohne dass der Splash sichtbar ist, passiert zweierlei Schlechtes: Der Splash-Text
+   wird samt „Return schließt diesen Bildschirm" für einen Bildschirm vorgelesen, der gar nicht
+   da ist — und über `MarkSplashSeen` **unterdrückt er die J11-Ansage**. Falls das eintritt:
+   `MarkSplashSeen` nur noch aus dem `OnEnable`-Patch aufrufen.
+3. **Wenn die Sperre zuschlägt: NICHT sofort bestätigen.** Erst `thought list` über die
+   Bridge laufen lassen — wenn keines der beiden Signale feuert, erscheint auch keine
+   Protokollzeile, und die Live-Liste ist dann die einzige Datenquelle. Danach die drei
+   Ausgänge unterscheiden: (a) Ansage kommt **und** Interaktion nennt den Gedanken → Fix sitzt;
+   (b) nur die Interaktionsmeldung → `fresh` taugt nicht, auf das Spiel-Flag umstellen;
+   (c) weiterhin bloß „Cannot interact with X right now" → keines der Signale markiert den
+   Zustand, Ansatz überdenken.
+4. Zum Mitschneiden: `tools/DevBridge/thought-watch.ps1 -GamePath "<Spielordner>"`
+   (rein lesend, alle 10 s, endet selbsttätig).
 
 **Eingespielt 25.09., 22:34: Stand `04dab2a`** (Mod + DevBridge). Damit ist alles aus
 dieser Sitzung im Spiel.
@@ -25,10 +53,15 @@ also immer `-GamePath "D:\SteamLibrary\steamapps\common\Disco Elysium"` mitgeben
 Kein Übergang eingefangen — „Die Bogensammlerin" kochte über die ganze Stunde weiter,
 `fresh=False`, `FreshCount=0`, `WillShowSplashScreenInstead=False`. Die Forschung dauert
 also deutlich länger als eine Spielstunde. **Der Live-Beweis steht weiterhin aus.**
-Nächster Anlauf: beim nächsten Spielen darauf achten, ob die neue Ansage kommt, sobald der
-Gedanke fertig wird. Das Skript dafür liegt als Vorlage im Sitzungs-Scratchpad
-(`thought-watch.ps1`) — **falls es nochmal gebraucht wird, gehört es nach der Projektregel
-ins Repo** (`tools/`), nicht in den Scratchpad.
+Nächster Anlauf: beim nächsten Spielen nach dem Prüfprotokoll oben vorgehen. Das
+Aufzeichnungs-Skript liegt jetzt im Repo: `tools/DevBridge/thought-watch.ps1`.
+
+**Bekannte Schwäche von `04dab2a`, beim nächsten Code-Anfassen mitfixen (nicht dringend):**
+Die „billige Vorprüfung" ist überall dort **nicht** billig, wo es keinen `CharacterSheet`
+gibt (Hauptmenü, Ladebildschirme): `ReadFreshCount` liefert dann `-1`, und `-1 != 0` öffnet
+das Tor — also läuft genau dort sekündlich `FindObjectOfType` **plus** `FindObjectsOfType`.
+Richtig wäre: „kein Charakterbogen" als geschlossenes Tor behandeln und das erneute Suchen
+ausbremsen.
 
 Darunter der Merkzettel vom Nachmittag — beim nächsten Mal **erst hier lesen**, dann fragen,
 womit sie anfangen will; nichts davon ohne ihr Okay beginnen.
@@ -83,6 +116,8 @@ Dialog-Warten, Danijels zwei Review-Korrekturen und die „lässt sich nicht anl
 
   **Nebenbefund 3 geklärt (noch nicht behoben)**: Die NREs stammen aus `ThoughtCabinetNavigationHandler.IsInThoughtCabinetView()` → `ViewController.GetCurrentView()` wirft, solange kein Spiel geladen ist (Hauptmenü). Eine Null-Prüfung auf den ViewController behebt es.
 
+- [ ] **J12 Vier Mod-Tasten teilen sich eine Taste mit einer Spielfunktion** (aufgefallen 25.09.2026 im Startprotokoll, noch nicht mit Jana besprochen) — Der eingebaute Konflikt-Prüfer meldet beim Start: **Leertaste** (unser StopMovement vs. spieleigenes StopMovement + UI Submit), **R** (RepeatDialogue vs. Collage Keyboard Redo), **H** (AnnounceStatus vs. PhotoMode), **Return** (CloseSplash vs. Enter + UI Submit + Collage Dialogue Entry Submit). Leertaste und Return sind vermutlich **gewollt** (wir benutzen absichtlich die spieleigenen Tasten). **H gegen PhotoMode ist der interessante Fall**: H ist Janas Statusansage und Grundlage von Strg+H/Shift+H (Heilen, J2) — falls PhotoMode dabei mitfeuert, wäre das ein echter Störer. **Zu klären**: Feuert PhotoMode bei H tatsächlich mit? R vs. Collage-Redo dürfte harmlos sein (Collage ist der Fotomodus). Erst messen, dann bewerten — nicht vorschnell umbelegen.
+
 - [ ] **J9 Objekt-Kategorisierung hängt an einer fest verdrahteten Stichwortliste** (Jana, 04.09.2026) — **Von Jana zurückgestellt: „muss ich mir noch mal überlegen" — nicht ohne ihre ausdrückliche Freigabe anfangen.** Symptom: In der Traumszene war der Gehängte („Hanged Tequila") beim Durchblättern der Kategorien mit Strg+Bild-Ab nur unter *Alles* zu finden, nie unter NSCs/Orte/Behälter. Ursache: `ObjectCategorizer.CategorizeObject` entscheidet ausschließlich über Namens-Stichwörter — Orte über "door/exit/gate/stairs/car/…", Behälter über "box/crate/container/money/…", NSCs über eine feste Namensliste (tommy, cuno, measurehead, joyce, evrart, …) plus "person/character/npc". Ein Objekt, dessen interner Name kein Stichwort trifft, fällt immer nach *Alles* durch; „Template-exit" landete dagegen wegen des "exit" im Namen unter *Orte*. **Vorschlag (nicht umgesetzt):** NSCs an einem Laufzeit-Signal festmachen statt am Namen — z. B. „hat das Objekt einen Conversant/Actor hinterlegt?" (das liest der Dev-Bridge-Befehl `names` bereits aus). Das entspräche auch der Projektregel „an globalen Laufzeit-Signalen festmachen, nicht an fest verdrahteten Namen". **Achtung Nebenwirkung:** Eine Umstellung ändert die Kategorien in ALLEN Bereichen, also auch dort, wo Jana die heutige Einteilung schon gewohnt ist — das ist vermutlich der Grund, warum sie es sich überlegen möchte.
 
 - [x] **J8 Traumsequenzen wurden nicht beschrieben, und Bereichsbeschreibungen redeten in laufende Dialoge hinein** (Jana, 04.09.2026) — Symptom: Beim Einschlafen kam nur „Neuer Bereich: Dream 2" (roher Szenenname, halb englisch), aber keine Beschreibung — Jana stand in einer stockdunklen Szene ohne jede Orientierung. **Zwei Ursachen, beide bestätigt:** (1) `Dream-2` hatte schlicht keinen Eintrag in `AreaDescriptions` — der Mechanismus ist global („hat die Szene einen Eintrag, sprich ihn"), Szenen ohne Eintrag bekommen nichts. (2) Selbst mit Eintrag wäre sie untergegangen: `AnnounceAreaIfChanged` sprach die Kurzbeschreibung **sofort** beim Szenenwechsel, ohne auf einen laufenden Dialog zu warten — und Träume beginnen **immer** mitten im Dialog (man schläft während eines Gesprächs ein). Im Sprachprotokoll lag „Neuer Bereich: Dream 2" (21:13:33) genau zwischen zwei Sätzen des Betts. **Fix:** (a) Kurzbeschreibung wird jetzt aufgeschoben, wenn beim Betreten ein Dialog läuft, und nachgeholt, sobald der Spieler wirklich Kontrolle hat — neue `AccessibilityMod.SpeakPendingDescriptionIfReady()`, gleiches Warte-Signal, das die lange Ersteinführung schon nutzt (`DialogStateManager.IsDialogUiActive`), bewusst **vor** der Einführung aufgerufen, damit die Reihenfolge kurz-vor-lang bleibt. Verlässt man den Bereich vorher wieder, verfällt die Ansage, ohne die Wiederholungssperre zu verbrauchen. Am globalen Laufzeit-Signal festgemacht, **nicht** an Szenennamen — gilt damit für jeden Bereich, nicht nur für Träume. (b) Neuer Eintrag `Dream-2` in `Names` („Ein Traum" statt „Dream 2") und in `Table`: reine Bühnenbeschreibung (Licht, Boden, Zäune, wohin der Boden führt), ohne Story — plus die zwei Dinge, die der Traum wortlos wegnimmt: **keine Bedienleiste** und **immer nur ein einziges anwählbares Objekt** (live verifiziert: die Objekt-Registrierung enthielt genau einen Eintrag, und je nach Standort einen anderen). **Bewusst NICHT beschrieben:** `Dream-3-ext` und `Dream-3-int` — dort war noch niemand; laut Dateikopf ist eine plausibel klingende falsche Beschreibung schlimmer als gar keine. **Offen: Janas Gegentest** beim nächsten Traum.
@@ -131,7 +166,7 @@ Status der 10 verifizierten Findings + Aufräumliste (Details im PR-Kommentar):
 - [x] **10 Hartes Enter am Splash** — neuer remappbarer `GameKey.CloseSplash` (Default Enter) in allen Presets + Katalog; Hinweistext nennt die Live-Bindung.
 - [x] **Aufräumliste B** umgesetzt: OnSelect-Patch nutzt `GetSelectionText` (eine Auflösungskette); Tab-Ordnung einmal kodiert (`TabOrder`); ein „Inventar offen?"-Signal (`IsInventoryViewOpen`/`IsPawnShopOpen` statt 3 Scans); Item-Namen über gemeinsamen Helper (listName-Fallback); ein `GetCharges` (Mod + DevBridge + Charakterbogen); Restladungs-Ansage ehrlich (kein fabriziertes „0 übrig"); Interop-Fehler werden geloggt und neutral angesagt statt als „leerer Tab"; toter Loc-Key `ThoughtCompleted` raus; irreführender „Öffne es mit I"-Text ersetzt; DevBridge-Texte von ctrl+plus befreit. **Zurückgestellt**: Gate-Vereinigung `AnnounceOnce`/`AnnounceText` (hängt an Janas Entscheidung zu 5/7) und die zwei als „gern separat" markierten Punkte (Modifier-Auflösung in `KeyBindings`, View-Handler-Konzept).
 
-- [ ] **J3 Gedankenkabinett: Forschungsergebnis komplett stumm, Navigation und Interaktion danach kaputt** — Mehrere Teilprobleme: (a) Forschungsergebnis stumm — **Fix**: Patch auf `ThoughtSplashScreenView` (SetProject+OnEnable) liest Titel, Gedanken-Beschreibung („das Gelaber"), Effekt und Boni-Liste; (b) Interaktion danach blockiert — **Ursache bestätigt (17.07.)**: Der Ergebnis-Splash ist modal, öffnet ohne Tastatur-Selektion, Schließen-Button mausexklusiv → unsichtbare Falle („laufen ja, interagieren nein"). **Fix**: Enter/Interakt-Taste schließt über `buttonClose.onClick` + `ViewController.SwitchToView(CLEAR)` (nur erzwungen, wenn der Button nicht selbst schon rausführt); Button-Selektion in `OnEnable` bewusst entfernt, damit `onClick` nicht doppelt feuert (PR-Review Danijel). Achtung: physisches Enter, EventSystem-Submit, synthetischer Klick, Escape und `OnControllerButtonToClosePressed` (NRE ohne Gamepad) scheitern ALLE; `View.SwitchToView` auf der View selbst ist nur der Callback, der Übergang muss über die ViewController-INSTANZ; (c) Navigation in der Anzeige — **Fix**: Kabinett-Slots erzählen beim Auswählen die volle Geschichte (Name/Status/Beschreibung/Effekte) per Selektions-Polling. **Lehre**: Harmony auf virtuelle Il2Cpp-Methoden (`ThoughtSlot.OnSelect`) crasht das Spiel nativ — nie wieder (vgl. Worklog #30). **Offen: Janas Gegentest** (braucht einen erforschbaren Gedanken).
+- [ ] **J3 Gedankenkabinett: Forschungsergebnis komplett stumm, Navigation und Interaktion danach kaputt** — Mehrere Teilprobleme: (a) Forschungsergebnis stumm — **Fix**: Patch auf `ThoughtSplashScreenView` (SetProject+OnEnable) liest Titel, Gedanken-Beschreibung („das Gelaber"), Effekt und Boni-Liste; (b) Interaktion danach blockiert — **Ursache bestätigt (17.07.)**: Der Ergebnis-Splash ist modal, öffnet ohne Tastatur-Selektion, Schließen-Button mausexklusiv → unsichtbare Falle („laufen ja, interagieren nein"). **Fix**: Enter/Interakt-Taste schließt über `buttonClose.onClick` + `ViewController.SwitchToView(CLEAR)` (nur erzwungen, wenn der Button nicht selbst schon rausführt); Button-Selektion in `OnEnable` bewusst entfernt, damit `onClick` nicht doppelt feuert (PR-Review Danijel). Achtung: physisches Enter, EventSystem-Submit, synthetischer Klick, Escape und `OnControllerButtonToClosePressed` (NRE ohne Gamepad) scheitern ALLE; `View.SwitchToView` auf der View selbst ist nur der Callback, der Übergang muss über die ViewController-INSTANZ; (c) Navigation in der Anzeige — **Fix**: Kabinett-Slots erzählen beim Auswählen die volle Geschichte (Name/Status/Beschreibung/Effekte) per Selektions-Polling. **Lehre**: Harmony auf virtuelle Il2Cpp-Methoden (`ThoughtSlot.OnSelect`) crasht das Spiel nativ — nie wieder (vgl. Worklog #30). **Offen: Janas Gegentest** (braucht einen erforschbaren Gedanken). **Nachtrag 25.09.2026:** Die Hälfte (a) dieses Fixes war bis `7dcc43d` **nur halb aktiv** — der `SetProject`-Patch hat nie gebunden (falscher Methodenname, siehe J11), es lief allein der `OnEnable`-Patch. Der nächste echte Splash testet damit **auch J3 neu**.
 
 - **Disco Elysium (Disco-A11y) — Hotkey-Problem behoben, eigener Fork + Release + Editor-Tool gebaut**
   Ursprüngliche Einschätzung ("hängt hinterher") war ein Trugschluss auf Basis der reinen Spielerfahrung: Repo ist inhaltlich das reifste der drei Mods (90 Commits, Sept 2025 – April 2026, voller Funktionsumfang: Navigation, Dialog, Inventar, Journal, Thought Cabinet, Charakterbogen, Waypoints, Braille, RTL-Sprachen). Eigentliche Ursache war rein technisch: Hotkeys hartcodiert auf Unitys physische US-QWERTY-`KeyCode`s (`[`, `]`, `\`, `;`, `'`, `` ` ``) — auf deutschem QWERTZ-Layout an anderer Stelle bzw. nur über AltGr erreichbar (kollidiert mit Unitys Ctrl+Alt-Meldung für AltGr).
