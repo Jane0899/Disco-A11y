@@ -1,9 +1,17 @@
 # Disco-A11y — TODOs
 
-## Hier weitermachen (Stand 25.09.2026, von Jana so festgehalten)
+## Hier weitermachen (Stand 25.09.2026, abends)
 
-Jana hat für heute Schluss gemacht. Beim nächsten Mal **erst hier lesen**, dann fragen,
-womit sie anfangen will — nichts davon ohne ihr Okay beginnen.
+**Laufender Arbeitsschritt: J11.** Jana hat J11 als Startpunkt gewählt, Umfang „Ansage +
+Grund bei blockierter Interaktion" (nicht: Splash selbst öffnen). Fix ist gebaut und
+committet (`7dcc43d`), **aber noch nicht live bestätigt** — Details im J11-Eintrag unten.
+Nächster Schritt: Spiel mit den neuen DLLs starten, dann per Bridge `thought pending` /
+`thought list` prüfen, welches Signal den Zustand markiert, und mit `thought fix <Name>`
+den Zustand herstellen. Spielstände sind gesichert unter
+`~/.claude/backups/disco-elysium/2026-09-25_20-09-36`.
+
+Darunter der Merkzettel vom Nachmittag — beim nächsten Mal **erst hier lesen**, dann fragen,
+womit sie anfangen will; nichts davon ohne ihr Okay beginnen.
 
 **Die drei Optionen, die ich ihr angeboten habe (ihre Reihenfolge nach Nutzen):**
 1. **J11 fixen** — ansagen, sobald ein Gedanke fertig ist und im Gedankenkabinett auf
@@ -40,6 +48,19 @@ Dialog-Warten, Danijels zwei Review-Korrekturen und die „lässt sich nicht anl
 - [ ] **J11 Fertiger Gedanke sperrt jede Interaktion — und nichts sagt es an** (Jana, 25.09.2026, von ihr selbst gelöst) — **Symptom**: Nach einem Gespräch (Kryptide, endete 18:59:55) war ab 19:01 **jede** Interaktion tot: Kim, Lena, Küchen-Hintertür, Fenster, **Exit-courtyard** — `InteractFirstActive` gab überall `False` zurück. Laufen, Ansagen, Tastenverarbeitung, Wegfindung funktionierten alle weiter, es sah also völlig normal aus. **Ursache**: Im Gedankenkabinett wartete ein fertiger Gedanke auf Bestätigung. **Lösung (Jana): `T` drücken, Gedanken im Kabinett bestätigen, Kabinett verlassen — danach lief alles wieder.** Kein Splash-Fenster im Weg: die aktive Ansicht war `CLEAR`, `TryCloseThoughtSplash` stieg korrekt aus (daher war das NICHT der bekannte Fall #57b).
   **Der eigentliche Mangel**: Ein blinder Spieler kann das unmöglich erkennen — die einzigen Signale sind ein oranger Punkt am Kabinett-Symbol und ein `FIXED`-Eintrag in der Gedankenliste, beides rein visuell bzw. nur per Diagnose sichtbar. **Fix-Idee (noch nicht umgesetzt, mit Jana abzustimmen)**: Sobald ein Gedanke fertig ist und auf Bestätigung wartet, ansagen — z. B. „Ein Gedanke ist fertig. Drücke T, um ihn im Gedankenkabinett zu bestätigen." Am globalen Laufzeit-Signal festmachen (Gedanken-Zustand `FIXED`/fertig abfragen), nicht an Szenen o. ä. Zweiter Kandidat: Wenn `InteractFirstActive` bei mehreren Objekten hintereinander `False` liefert, ist das ein starker Hinweis auf genau so eine Sperre — das könnte der Mod erkennen und den Grund nennen, statt nur „Cannot interact with X right now" zu wiederholen.
   **Nebenbefund**: 1853 Protokollfehler „Error checking if in thought cabinet view" (NullReferenceException, im Frame-Takt bis 18:00:09). Beide Fundstellen fangen sauber ab und geben `false` zurück, blockieren also nichts — aber die Ursache der NREs ist ungeklärt und sollte bei Gelegenheit angesehen werden.
+
+  **Bearbeitung 25.09.2026 (Commit `7dcc43d`, gebaut, noch NICHT live bestätigt):**
+  - **Zeitlinie am Protokoll bestätigt**: letzte funktionierende Interaktion 18:46:41 (Lena: True), ab 19:01:13 alles `False` (Hintertür, Fenster, Exit-courtyard, Kim, Lena), 19:18:13 Splash „Weiße Trauer", 19:19:53 Kim wieder `True`.
+  - **Das Laufzeit-Signal heißt im Spiel selbst `ThoughtManager.WillShowSplashScreenInstead()`** (public static bool) — „zeige den Splash **statt** der normalen Interaktion". Mit Maus poppt der Splash beim nächsten Klick; unser Tastaturweg ruft `MouseOverHighlight.InteractFirstActive` direkt auf, bekommt nur `False`, und niemand zeigt den Splash.
+  - **`FIXED` allein ist NICHT das Signal** — live über die Bridge geprüft: nach Auflösung standen „Weiße Trauer" und „Guillaume le Million" beide auf `FIXED`, nichts war blockiert. Zweites Kennzeichen ist das spieleigene `fresh`-Flag am `ThoughtCabinetProject` (= der orange Punkt in Datenform), dazu `CharacterThoughts.FreshCount`.
+  - **Umgesetzt**: `PendingThoughtWatcher` (in `mod/Patches/ThoughtCompletionPatches.cs`) prüft 1× pro Sekunde auf „fertig und unbestätigt" (beide Signale ODER-verknüpft, beide beim Umschalten protokolliert) und sagt es **einmal** an, aufgeschoben solange ein Dialog läuft (Muster aus J8). Eine fehlgeschlagene Interaktion nennt jetzt diesen Grund statt „Cannot interact with X right now". Beide Texte nennen die **echte Spieltaste** fürs Kabinett, live aus den Spielbelegungen gelesen (`GameKeybindConflictChecker.GetGameKeyFor("ThoughtCabinet")`) — nie „T" fest verdrahtet.
+  - **OFFEN: live bestätigen**, welches der beiden Signale den Zustand tatsächlich markiert. Dafür Bridge-Befehl `thought pending` bzw. `thought list` (zeigt jetzt `fresh`, `FreshCount`, `WillShowSplashScreenInstead`) und `thought fix <Name>` zum Herstellen des Zustands.
+
+  **Zwei Fehler, die dabei nebenbei auffielen (beide in `7dcc43d` behoben):**
+  1. **Ein Harmony-Patch hat nie funktioniert**: `ThoughtSplashScreen_SetProject_Patch` zielte auf `SetProject` — die Methode heißt `SetThoughtProject`. Harmony meldete das bei **jedem** Start („Could not find method …"), die Ausnahme flog aus `PatchAll` heraus, und der Mod protokollierte zusätzlich „Failed to apply Harmony patches". Wirkung: Beim Durchblättern mehrerer fertiger Gedanken im Splash wurde nur der erste angesagt (der kommt vom `OnEnable`-Patch). **Wichtig, weil kontraintuitiv:** Die übrigen Patches waren trotzdem aktiv — am Protokoll geprüft (`[THOUGHT] Splash announced` um 19:18:13). **Lehre: nach dem Anlegen eines Patches immer das Startprotokoll lesen** — ein nicht greifender Patch scheitert laut im Log und stumm im Spiel.
+  2. **Unser Testwerkzeug testete den falschen Weg**: Bridge-Befehl `thought discover` ruft `CharacterThoughts.DiscoverThought` — diese Methode hat im Spiel **0 Aufrufer** (im Klassen-Dump geprüft), das Spiel geht diesen Weg also nie. Der echte Weg ist `FixThought` (4 Aufrufer); dafür gibt es jetzt `thought fix`. **Lehre: vor dem Bauen eines Testwerkzeugs prüfen, ob die angesteuerte Methode im Spiel überhaupt aufgerufen wird** — sonst meldet der Test Erfolg für einen Ablauf, den es real nicht gibt.
+
+  **Nebenbefund 3 geklärt (noch nicht behoben)**: Die NREs stammen aus `ThoughtCabinetNavigationHandler.IsInThoughtCabinetView()` → `ViewController.GetCurrentView()` wirft, solange kein Spiel geladen ist (Hauptmenü). Eine Null-Prüfung auf den ViewController behebt es.
 
 - [ ] **J9 Objekt-Kategorisierung hängt an einer fest verdrahteten Stichwortliste** (Jana, 04.09.2026) — **Von Jana zurückgestellt: „muss ich mir noch mal überlegen" — nicht ohne ihre ausdrückliche Freigabe anfangen.** Symptom: In der Traumszene war der Gehängte („Hanged Tequila") beim Durchblättern der Kategorien mit Strg+Bild-Ab nur unter *Alles* zu finden, nie unter NSCs/Orte/Behälter. Ursache: `ObjectCategorizer.CategorizeObject` entscheidet ausschließlich über Namens-Stichwörter — Orte über "door/exit/gate/stairs/car/…", Behälter über "box/crate/container/money/…", NSCs über eine feste Namensliste (tommy, cuno, measurehead, joyce, evrart, …) plus "person/character/npc". Ein Objekt, dessen interner Name kein Stichwort trifft, fällt immer nach *Alles* durch; „Template-exit" landete dagegen wegen des "exit" im Namen unter *Orte*. **Vorschlag (nicht umgesetzt):** NSCs an einem Laufzeit-Signal festmachen statt am Namen — z. B. „hat das Objekt einen Conversant/Actor hinterlegt?" (das liest der Dev-Bridge-Befehl `names` bereits aus). Das entspräche auch der Projektregel „an globalen Laufzeit-Signalen festmachen, nicht an fest verdrahteten Namen". **Achtung Nebenwirkung:** Eine Umstellung ändert die Kategorien in ALLEN Bereichen, also auch dort, wo Jana die heutige Einteilung schon gewohnt ist — das ist vermutlich der Grund, warum sie es sich überlegen möchte.
 
