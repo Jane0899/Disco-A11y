@@ -183,6 +183,17 @@ namespace AccessibilityMod.Patches
         // descriptions wait (see AccessibilityMod.SpeakPendingDescriptionIfReady).
         private static bool announcementPending;
 
+        // Stand-in key for "announced, but we never learned which thought it was" - so the
+        // once-only rule still holds when the name is unknown.
+        private const string UNNAMED = "\u0000unnamed";
+
+        // The thoughts that were cooking at the previous poll, by display name. A thought
+        // that was cooking and suddenly is not IS the one that just finished - which
+        // recovers the name even when the only signal that fired is the game's global
+        // splash flag, and the per-thought `fresh` scan came up empty.
+        private static readonly System.Collections.Generic.HashSet<string> lastCooking =
+            new System.Collections.Generic.HashSet<string>();
+
         /// <summary>
         /// True while a finished thought is waiting for confirmation and the game is
         /// therefore refusing interactions. Read by the interaction path to explain a
@@ -218,10 +229,18 @@ namespace AccessibilityMod.Patches
                     MelonLogger.Msg("[THOUGHT] Block lifted - thought confirmed");
                     announcedName = null;
                     announcementPending = false;
+                    waitingName = null;
                 }
 
                 waiting = nowWaiting;
-                waitingName = name;
+
+                // Keep a name once we have one. Both ways of learning it are momentary:
+                // the `fresh` flag clears when the player looks, and the "left COOKING
+                // since the last poll" fallback only matches on the single poll where the
+                // transition happened. Overwriting with null a second later would strip
+                // the name off an announcement that is still waiting for the dialogue to
+                // end. Cleared on the falling edge above, so the next thought starts fresh.
+                if (name != null) waitingName = name;
 
                 SpeakIfReady();
             }
@@ -243,24 +262,32 @@ namespace AccessibilityMod.Patches
             if (!announcementPending) return;
             if (UI.DialogStateManager.IsDialogUiActive) return;
 
-            // Nothing to name = nothing worth saying here. The block itself is still
-            // covered: a failed interaction explains it at the moment it bites.
-            if (string.IsNullOrEmpty(waitingName))
-            {
-                MelonLogger.Msg("[THOUGHT] Waiting thought could not be named - skipping the spoken hint");
-                announcementPending = false;
-                return;
-            }
+            if (waitingName != null && waitingName == announcedName) { announcementPending = false; return; }
 
-            if (waitingName == announcedName) { announcementPending = false; return; }
-
-            announcedName = waitingName;
+            announcedName = waitingName ?? UNNAMED;
             announcementPending = false;
 
             string key = Settings.GameKeybindConflictChecker.GetGameKeyFor("ThoughtCabinet");
-            string message = key != null
-                ? Loc.Get("ThoughtReadyToConfirm", waitingName, key)
-                : Loc.Get("ThoughtReadyToConfirmNoKey", waitingName);
+
+            // Not being able to name the thought must never swallow the announcement:
+            // the whole point of J11 is that the player is otherwise left in a world
+            // that has silently stopped responding. Without a name the sentence just
+            // drops it - "a thought has finished" still says everything that has to be
+            // done about it.
+            string message;
+            if (waitingName == null)
+            {
+                MelonLogger.Msg("[THOUGHT] Waiting thought could not be named - announcing without it");
+                message = key != null
+                    ? Loc.Get("ThoughtReadyUnnamed", key)
+                    : Loc.Get("ThoughtReadyUnnamedNoKey");
+            }
+            else
+            {
+                message = key != null
+                    ? Loc.Get("ThoughtReadyToConfirm", waitingName, key)
+                    : Loc.Get("ThoughtReadyToConfirmNoKey", waitingName);
+            }
 
             // Interrupting: from this moment the world has stopped responding, and
             // everything the player tries until they act on this is wasted effort.
@@ -320,20 +347,35 @@ namespace AccessibilityMod.Patches
                 // No ThoughtManager yet (main menu, loading) - not an error, just "no".
             }
 
-            // Find the finished-but-unseen thought. Also runs when splashPending is
-            // false, because it is what gives the announcement a name.
+            // One scan, two jobs: find the finished-but-unseen thought (the second signal,
+            // and the announcement's name), and note which thoughts are cooking right now
+            // so the NEXT poll can tell which one just stopped.
+            var cookingNow = new System.Collections.Generic.HashSet<string>();
+            bool scanned = false;
             try
             {
                 var projects = UnityEngine.Object.FindObjectsOfType<ThoughtCabinetProject>(true);
+                scanned = true;
                 foreach (var p in projects)
                 {
                     if (p == null) continue;
+
+                    if (p.state == ThoughtState.COOKING)
+                    {
+                        var cookingName = p.displayName;
+                        if (!string.IsNullOrEmpty(cookingName)) cookingNow.Add(cookingName);
+                        continue;
+                    }
+
                     if (p.state != ThoughtState.DISCOVERED && p.state != ThoughtState.FIXED) continue;
                     if (!p.fresh) continue;
 
-                    name = p.displayName;
-                    freshFinished = true;
-                    return true;
+                    // First finished-and-unseen thought wins; there is normally only one.
+                    if (name == null)
+                    {
+                        name = p.displayName;
+                        freshFinished = true;
+                    }
                 }
             }
             catch (Exception ex)
@@ -341,7 +383,24 @@ namespace AccessibilityMod.Patches
                 MelonLogger.Warning($"[THOUGHT] Could not scan thought projects: {ex.Message}");
             }
 
-            return splashPending;
+            // Fallback name: the game's global flag says a splash is pending, but no
+            // thought carries `fresh`. Whatever left COOKING since the last poll is the
+            // thought in question.
+            if (name == null && splashPending && scanned)
+            {
+                foreach (var wasCooking in lastCooking)
+                {
+                    if (!cookingNow.Contains(wasCooking)) { name = wasCooking; break; }
+                }
+            }
+
+            if (scanned)
+            {
+                lastCooking.Clear();
+                foreach (var c in cookingNow) lastCooking.Add(c);
+            }
+
+            return freshFinished || splashPending;
         }
     }
 

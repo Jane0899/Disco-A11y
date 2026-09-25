@@ -10,6 +10,14 @@ Nächster Schritt: Spiel mit den neuen DLLs starten, dann per Bridge `thought pe
 den Zustand herstellen. Spielstände sind gesichert unter
 `~/.claude/backups/disco-elysium/2026-09-25_20-09-36`.
 
+**ACHTUNG beim nächsten Start:** Im Spiel liegt die DLL von `7dcc43d` (eingespielt 25.09.,
+21:16). Alles danach (`c74b4d8` Doppel-Signal-Protokollierung, Namens-Rückfallweg, Ansage
+auch ohne Namen) ist gebaut, aber **noch nicht eingespielt** — bei geschlossenem Spiel
+einmal `dotnet build mod/AccessibilityMod.csproj -c Release` mit gesetztem
+`DISCO_ELYSIUM_PATH` laufen lassen, dann kopiert der Build sie selbst hinein.
+Spielpfad ist `D:\SteamLibrary\steamapps\common\Disco Elysium` (die Umgebungsvariable ist
+auf diesem Rechner NICHT gesetzt, und der Vorgabepfad im Code zeigt ins Leere).
+
 Darunter der Merkzettel vom Nachmittag — beim nächsten Mal **erst hier lesen**, dann fragen,
 womit sie anfangen will; nichts davon ohne ihr Okay beginnen.
 

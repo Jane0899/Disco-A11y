@@ -293,6 +293,15 @@ namespace AccessibilityMod.Settings
             ["ThoughtReadyToConfirmNoKey"] = (
                 "A thought has finished: {0}. Confirm it in the thought cabinet - until then nothing can be interacted with.",
                 "Ein Gedanke ist fertig: {0}. Bestätige ihn im Gedankenkabinett - bis dahin lässt sich nichts benutzen."),
+            // Same hint when the thought could not be named. Being unable to name it must
+            // never swallow the announcement - the player is otherwise left in a world
+            // that has silently stopped responding, which is the whole of J11.
+            ["ThoughtReadyUnnamed"] = (
+                "A thought has finished. Press {0} to confirm it in the thought cabinet - until then nothing can be interacted with.",
+                "Ein Gedanke ist fertig. Drücke {0}, um ihn im Gedankenkabinett zu bestätigen - bis dahin lässt sich nichts benutzen."),
+            ["ThoughtReadyUnnamedNoKey"] = (
+                "A thought has finished. Confirm it in the thought cabinet - until then nothing can be interacted with.",
+                "Ein Gedanke ist fertig. Bestätige ihn im Gedankenkabinett - bis dahin lässt sich nichts benutzen."),
             ["ThoughtBlocksInteractionNoKey"] = (
                 "{0} cannot be used right now: a finished thought is waiting to be confirmed in the thought cabinet.",
                 "{0} lässt sich gerade nicht benutzen: Ein fertiger Gedanke wartet im Gedankenkabinett auf Bestätigung."),
