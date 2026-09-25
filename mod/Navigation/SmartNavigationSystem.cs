@@ -565,7 +565,14 @@ namespace AccessibilityMod.Navigation
                 MelonLogger.Msg($"[SMART NAV] InteractFirstActive on {objectName}: {interacted}");
                 if (!interacted && !locked)
                 {
-                    TolkScreenReader.Instance.Speak($"Cannot interact with {objectName} right now.", true);
+                    // A finished, unconfirmed thought makes the game refuse EVERY
+                    // interaction (J11) - so "cannot interact with X" names the symptom
+                    // and hides the one thing the player has to do about it. When that is
+                    // what is going on, say so instead; the wording carries the game's
+                    // own thought cabinet key, read live.
+                    string blockedByThought = Patches.PendingThoughtWatcher.GetBlockedInteractionMessage(objectName);
+                    TolkScreenReader.Instance.Speak(
+                        blockedByThought ?? $"Cannot interact with {objectName} right now.", true);
                 }
             }
             catch (Exception ex)

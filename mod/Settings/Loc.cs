@@ -273,6 +273,29 @@ namespace AccessibilityMod.Settings
             ["SplashCloseHint"] = (
                 "Press {0} to close this screen.",
                 "{0} schließt diesen Bildschirm."),
+            // J11: a thought that finished cooking but was never confirmed blocks EVERY
+            // interaction in the world - and the game says so only visually (an orange
+            // dot on the cabinet button). The player is left walking around a world that
+            // has silently stopped responding. {0} = thought name, {1} = the GAME's own
+            // thought cabinet key, read live (never hardcode "T": it is rebindable).
+            ["ThoughtReadyToConfirm"] = (
+                "A thought has finished: {0}. Press {1} to confirm it in the thought cabinet - until then nothing can be interacted with.",
+                "Ein Gedanke ist fertig: {0}. Drücke {1}, um ihn im Gedankenkabinett zu bestätigen - bis dahin lässt sich nichts benutzen."),
+            // Same block, but said at the moment it actually bites: the player tried to
+            // interact and got nothing. Replaces the bare "cannot interact right now",
+            // which named the symptom and hid the cause. {0} = object, {1} = cabinet key.
+            ["ThoughtBlocksInteraction"] = (
+                "{0} cannot be used right now: a finished thought is waiting to be confirmed. Press {1} to open the thought cabinet.",
+                "{0} lässt sich gerade nicht benutzen: Ein fertiger Gedanke wartet auf Bestätigung. Drücke {1} für das Gedankenkabinett."),
+            // Fallback wording for both of the above when the game's own bindings could
+            // not be read, so the key name is unknown. Saying nothing about the key would
+            // leave the player stuck with a diagnosis and no cure.
+            ["ThoughtReadyToConfirmNoKey"] = (
+                "A thought has finished: {0}. Confirm it in the thought cabinet - until then nothing can be interacted with.",
+                "Ein Gedanke ist fertig: {0}. Bestätige ihn im Gedankenkabinett - bis dahin lässt sich nichts benutzen."),
+            ["ThoughtBlocksInteractionNoKey"] = (
+                "{0} cannot be used right now: a finished thought is waiting to be confirmed in the thought cabinet.",
+                "{0} lässt sich gerade nicht benutzen: Ein fertiger Gedanke wartet im Gedankenkabinett auf Bestätigung."),
             // Name of the splash for the screen announcer ("which screen am I on?").
             ["Screen_THOUGHTSPLASHSCREEN"] = (
                 "Research result",

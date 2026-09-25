@@ -718,24 +718,92 @@ namespace DevBridge
 
                 case "thought":
                 {
-                    // Test rig for bug #57 (thought cabinet completion): "thought list"
-                    // shows every ThoughtCabinetProject with its state; "thought discover
-                    // <namepart>" finishes one through the game's own research-completed
-                    // path (CharacterThoughts.DiscoverThought), so the real splash flow
-                    // runs - no waiting for in-game hours to pass.
+                    // Test rig for the thought cabinet (bug #57, and J11: a finished but
+                    // unconfirmed thought silently blocks EVERY interaction).
+                    //
+                    // "thought list" shows every ThoughtCabinetProject with the three
+                    // markers that together say "finished and still unconfirmed":
+                    //   state  - UNKNOWN/KNOWN/COOKING/DISCOVERED/FIXED/FORGOTTEN
+                    //   fresh  - the game's own "player has not looked at this yet" flag,
+                    //            the orange dot on the cabinet button in numeric form
+                    //   plus, in the header, CharacterThoughts.FreshCount and
+                    //   ThoughtManager.WillShowSplashScreenInstead() - the latter is the
+                    //   game's own name for "a splash is queued, show it INSTEAD of the
+                    //   normal interaction", i.e. the prime suspect for the J11 block.
+                    // state alone is provably not the signal: after J11 was resolved, two
+                    // thoughts sat at FIXED and nothing was blocked (live, 25.09.2026).
+                    //
+                    // WARNING about "thought discover": CharacterThoughts.DiscoverThought
+                    // has ZERO callers in the game (checked in the class dump) - it is a
+                    // path the game itself never takes, so a test through it proves
+                    // nothing about the real flow. "thought fix" uses FixThought instead,
+                    // which the game calls from four places, and is the honest way to
+                    // reproduce a finished thought on demand.
                     var sheet = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Metric.CharacterSheet>();
                     if (sheet == null || sheet.thoughts == null) return "CharacterSheet/thoughts not found";
 
                     var projects = UnityEngine.Object.FindObjectsOfType<Il2CppSunshine.Metric.ThoughtCabinetProject>(true);
-                    if (parts.Length < 2 || parts[1] == "list")
+                    if (parts.Length < 2 || parts[1] == "list" || parts[1] == "pending")
                     {
                         var sb = new StringBuilder();
+
+                        // Header first: the two global markers. Each is read defensively -
+                        // a diagnostic that dies on one null teaches nothing about the rest.
+                        string freshCount;
+                        try { freshCount = sheet.thoughts.FreshCount.ToString(); }
+                        catch (Exception ex) { freshCount = "ERR " + ex.Message; }
+
+                        string willSplash;
+                        try { willSplash = Il2CppSunshine.ThoughtManager.WillShowSplashScreenInstead().ToString(); }
+                        catch (Exception ex) { willSplash = "ERR " + ex.Message; }
+
+                        sb.AppendLine($"FreshCount={freshCount}  WillShowSplashScreenInstead={willSplash}");
+
+                        // "pending" is the short answer for a watcher loop: only the
+                        // thoughts that are finished AND still flagged fresh, which is the
+                        // candidate condition for "this is what is blocking you".
+                        bool onlyPending = parts.Length >= 2 && parts[1] == "pending";
+
                         foreach (var p in projects)
                         {
                             if (p == null) continue;
-                            sb.AppendLine($"{p.state,-10} | {p.name} | '{p.displayName}'");
+
+                            bool fresh;
+                            try { fresh = p.fresh; }
+                            catch { fresh = false; }
+
+                            bool finished = p.state == Il2CppSunshine.Metric.ThoughtState.DISCOVERED
+                                         || p.state == Il2CppSunshine.Metric.ThoughtState.FIXED;
+
+                            if (onlyPending && !(fresh && finished)) continue;
+
+                            sb.AppendLine($"{p.state,-10} | fresh={fresh,-5} | {p.name} | '{p.displayName}'");
                         }
-                        return sb.Length == 0 ? "(no thoughts found)" : sb.ToString().TrimEnd();
+                        return sb.ToString().TrimEnd();
+                    }
+
+                    if (parts[1] == "fix" && parts.Length >= 3)
+                    {
+                        // The game's REAL research-completed call (4 call sites), as
+                        // opposed to DiscoverThought (0). This is how J11 is reproduced
+                        // on demand instead of waiting for in-game research hours.
+                        // It changes the character sheet, so it belongs on a backup save.
+                        string part = string.Join(" ", parts.Skip(2)).ToLowerInvariant();
+                        var target = projects.FirstOrDefault(p => p != null &&
+                            ((p.displayName ?? "").ToLowerInvariant().Contains(part)
+                             || (p.name ?? "").ToLowerInvariant().Contains(part)));
+                        if (target == null) return $"no thought matching '{part}'";
+
+                        var stateBefore = target.state;
+                        sheet.thoughts.FixThought(target);
+
+                        string willAfter;
+                        try { willAfter = Il2CppSunshine.ThoughtManager.WillShowSplashScreenInstead().ToString(); }
+                        catch (Exception ex) { willAfter = "ERR " + ex.Message; }
+
+                        return $"FixThought('{target.displayName}'): state {stateBefore} -> {target.state}, "
+                             + $"fresh={target.fresh}, FreshCount={sheet.thoughts.FreshCount}, "
+                             + $"WillShowSplashScreenInstead={willAfter}";
                     }
 
                     if ((parts[1] == "discover" || parts[1] == "splash") && parts.Length >= 3)
@@ -769,7 +837,12 @@ namespace DevBridge
                         return $"DiscoverThought('{target.displayName}') called (state before: {before}, now: {target.state})";
                     }
 
-                    return "usage: thought [list | discover <namepart> | splash <namepart>]";
+                    return "usage: thought [list | pending | fix <namepart> | discover <namepart> | splash <namepart>]\n"
+                         + "  list    - every thought with state + fresh flag, header has FreshCount/WillShowSplashScreenInstead\n"
+                         + "  pending - only thoughts that are finished AND still fresh (the J11 candidate condition)\n"
+                         + "  fix     - complete one through the game's real path (FixThought); CHANGES THE SAVE\n"
+                         + "  discover- CharacterThoughts.DiscoverThought; note: 0 callers in the game, proves nothing\n"
+                         + "  splash  - queue + run the splash screen for one thought";
                 }
 
                 case "pages":

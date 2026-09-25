@@ -382,6 +382,10 @@ namespace AccessibilityMod
 
                 // Update thought cabinet cache
                 ThoughtCabinetNavigationHandler.UpdateThoughtCache();
+
+                // Watch for a finished thought that is silently blocking every
+                // interaction until it is confirmed (J11). Self-throttled to 1 Hz.
+                Patches.PendingThoughtWatcher.Update();
             }
             catch (Exception ex)
             {
