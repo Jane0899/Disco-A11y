@@ -194,6 +194,38 @@ namespace AccessibilityMod.Patches
         private static readonly System.Collections.Generic.HashSet<string> lastCooking =
             new System.Collections.Generic.HashSet<string>();
 
+        // How often the cooking snapshot is refreshed while nothing is going on.
+        private const float SNAPSHOT_SECONDS = 30f;
+        private static float nextSnapshotTime;
+
+        // The character sheet carries FreshCount. Held on to rather than looked up every
+        // second: FindObjectOfType is exactly the kind of scan the cheap gate exists to
+        // avoid. Re-found when it goes away (scene change, load).
+        private static Il2CppSunshine.Metric.CharacterSheet cachedSheet;
+
+        /// <summary>
+        /// The game's count of thought-cabinet entries the player has not looked at yet -
+        /// the orange dot as a number. Returns -1 when it cannot be read, which callers
+        /// treat as "unknown, look properly" rather than "nothing there".
+        /// </summary>
+        private static int ReadFreshCount()
+        {
+            try
+            {
+                if (cachedSheet == null)
+                {
+                    cachedSheet = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Metric.CharacterSheet>();
+                }
+                if (cachedSheet == null || cachedSheet.thoughts == null) return -1;
+                return cachedSheet.thoughts.FreshCount;
+            }
+            catch
+            {
+                cachedSheet = null;
+                return -1;
+            }
+        }
+
         /// <summary>
         /// True while a finished thought is waiting for confirmation and the game is
         /// therefore refusing interactions. Read by the interaction path to explain a
@@ -346,6 +378,27 @@ namespace AccessibilityMod.Patches
             {
                 // No ThoughtManager yet (main menu, loading) - not an error, just "no".
             }
+
+            // Cheap gate before the expensive part. Scanning all ~53 thought objects once
+            // a second to answer a question whose answer changes every few in-game HOURS
+            // is waste (the player said so, and she is right). Both of these are single
+            // field reads off objects we already hold:
+            //   - the game's global splash flag, read above,
+            //   - CharacterThoughts.FreshCount, the count behind the orange dot.
+            // FreshCount counts every unseen thought, including a newly GAINED one that
+            // blocks nothing - so it cannot decide the question, only open the gate. When
+            // it is 0 and no splash is pending, there is provably nothing to look for and
+            // the scan is skipped entirely. Unreadable (-1) also opens the gate: better a
+            // scan too many than a missed block.
+            int freshCount = ReadFreshCount();
+            bool somethingIsNew = splashPending || freshCount != 0;
+
+            // Even with nothing new, refresh the cooking snapshot now and then: it is what
+            // names the finished thought if the `fresh` flag is not what marks the state,
+            // and a snapshot from an hour ago would name the wrong one.
+            bool timeForSnapshot = UnityEngine.Time.unscaledTime >= nextSnapshotTime;
+            if (!somethingIsNew && !timeForSnapshot) return false;
+            if (timeForSnapshot) nextSnapshotTime = UnityEngine.Time.unscaledTime + SNAPSHOT_SECONDS;
 
             // One scan, two jobs: find the finished-but-unseen thought (the second signal,
             // and the announcement's name), and note which thoughts are cooking right now
