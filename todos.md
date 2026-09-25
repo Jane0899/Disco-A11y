@@ -10,13 +10,25 @@ Nächster Schritt: Spiel mit den neuen DLLs starten, dann per Bridge `thought pe
 den Zustand herstellen. Spielstände sind gesichert unter
 `~/.claude/backups/disco-elysium/2026-09-25_20-09-36`.
 
-**ACHTUNG beim nächsten Start:** Im Spiel liegt die DLL von `7dcc43d` (eingespielt 25.09.,
-21:16). Alles danach (`c74b4d8` Doppel-Signal-Protokollierung, Namens-Rückfallweg, Ansage
-auch ohne Namen) ist gebaut, aber **noch nicht eingespielt** — bei geschlossenem Spiel
-einmal `dotnet build mod/AccessibilityMod.csproj -c Release` mit gesetztem
-`DISCO_ELYSIUM_PATH` laufen lassen, dann kopiert der Build sie selbst hinein.
-Spielpfad ist `D:\SteamLibrary\steamapps\common\Disco Elysium` (die Umgebungsvariable ist
-auf diesem Rechner NICHT gesetzt, und der Vorgabepfad im Code zeigt ins Leere).
+**Eingespielt 25.09., 22:34: Stand `04dab2a`** (Mod + DevBridge). Damit ist alles aus
+dieser Sitzung im Spiel.
+
+**Spielpfad:** `D:\SteamLibrary\steamapps\common\Disco Elysium`. Die Umgebungsvariable
+`DISCO_ELYSIUM_PATH` ist auf diesem Rechner **nicht** gesetzt, und der im Code hinterlegte
+Vorgabepfad (Steam-Standard unter `C:\Program Files (x86)`) existiert hier nicht — vor dem
+Bauen also setzen, sonst baut man gegen ins Leere zeigende Verweise. Dasselbe gilt für
+`tools/DevBridge/bridge-client.ps1`: Vorgabe `-GamePath` ist derselbe falsche Pfad,
+also immer `-GamePath "D:\SteamLibrary\steamapps\common\Disco Elysium"` mitgeben.
+(**Kleine offene Verbesserung:** beide Vorgaben könnten das Spiel selbst suchen statt zu raten.)
+
+**Testlauf 25.09., 21:37–22:33 (rein lesende Aufzeichnung über die Bridge, alle 10 s):**
+Kein Übergang eingefangen — „Die Bogensammlerin" kochte über die ganze Stunde weiter,
+`fresh=False`, `FreshCount=0`, `WillShowSplashScreenInstead=False`. Die Forschung dauert
+also deutlich länger als eine Spielstunde. **Der Live-Beweis steht weiterhin aus.**
+Nächster Anlauf: beim nächsten Spielen darauf achten, ob die neue Ansage kommt, sobald der
+Gedanke fertig wird. Das Skript dafür liegt als Vorlage im Sitzungs-Scratchpad
+(`thought-watch.ps1`) — **falls es nochmal gebraucht wird, gehört es nach der Projektregel
+ins Repo** (`tools/`), nicht in den Scratchpad.
 
 Darunter der Merkzettel vom Nachmittag — beim nächsten Mal **erst hier lesen**, dann fragen,
 womit sie anfangen will; nichts davon ohne ihr Okay beginnen.
