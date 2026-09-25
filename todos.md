@@ -1,5 +1,36 @@
 # Disco-A11y — TODOs
 
+## Hier weitermachen (Stand 25.09.2026, von Jana so festgehalten)
+
+Jana hat für heute Schluss gemacht. Beim nächsten Mal **erst hier lesen**, dann fragen,
+womit sie anfangen will — nichts davon ohne ihr Okay beginnen.
+
+**Die drei Optionen, die ich ihr angeboten habe (ihre Reihenfolge nach Nutzen):**
+1. **J11 fixen** — ansagen, sobald ein Gedanke fertig ist und im Gedankenkabinett auf
+   Bestätigung wartet. Das ist der Fehler, der sie am 25.09. blockiert hat (jede
+   Interaktion tot, ohne jeden Hinweis); er wird wiederkommen.
+2. **Sperre erkennen statt sie zu wiederholen** — wenn `InteractFirstActive` bei mehreren
+   Objekten hintereinander `False` liefert, nicht stumpf „Cannot interact with X right
+   now" wiederholen, sondern auf eine solche Blockade hinweisen.
+3. **Die 1853 Protokollfehler** „Error checking if in thought cabinet view"
+   (NullReferenceException, im Frame-Takt) ansehen — blockieren nichts, weil beide
+   Fundstellen sauber `false` zurückgeben, deuten aber auf etwas Kaputtes in genau der
+   Ecke hin, in der J11 passiert ist.
+
+**Außerdem offen, unabhängig davon:**
+- **Janas Gegentest am Pfandleiher-Bildschirm** (Danijels Review-Szenario c): Was macht
+  `F` dort? Vorher speichern — ein versehentlicher Verkauf wäre nur durch Neuladen
+  rückgängig zu machen. Szenarien (a) leerer Slot und (b) Inventar-Knopf sind erledigt;
+  (b) stellte sich als per Tastatur gar nicht erreichbar heraus.
+- **Antwort an Danijel unter PR #2** ist vorbereitet, aber **nicht gepostet** — Jana wollte
+  sie vorher freigeben. Inhalt: beide Review-Befunde eingebaut (`899f7bb`), (a) und (b)
+  getestet, (c) offen.
+- **J9 (Objekt-Kategorisierung)** liegt auf Eis: Jana will sich das noch überlegen.
+
+**Stand der Auslieferung:** Alles committet und gepusht, nichts Uncommittetes. Die
+eingespielte DLL im Spiel ist vom 04.09., 23:45 und enthält Traumbeschreibung,
+Dialog-Warten, Danijels zwei Review-Korrekturen und die „lässt sich nicht anlegen"-Ansage.
+
 ## Offene Bugs aus Janas Spielsession (16.07.2026, Quelle: „Fehler Disco.txt")
 
 (Nummerierung J1–J3 statt #55–#57, weil #55–#57 im Worklog weiter unten schon anderweitig vergeben sind — Hinweis aus Danijels PR-Review.)
