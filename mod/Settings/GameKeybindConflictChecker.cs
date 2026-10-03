@@ -42,6 +42,7 @@ namespace AccessibilityMod.Settings
                 }
 
                 done = true;
+                CacheKeysByAction(gameBindings);
                 DumpGameBindings(gameBindings);
                 WriteReferenceFile(gameBindings);
                 AnnounceConflicts(gameBindings);
@@ -50,6 +51,51 @@ namespace AccessibilityMod.Settings
             {
                 MelonLogger.Warning($"[KEYBIND CONFLICTS] Check failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Game action name -> the keys bound to it, filled once from the live bindings.
+        /// Exists so an announcement can name one of the GAME's own keys (not a mod
+        /// hotkey) without hardcoding it: telling a player "press T" is wrong the moment
+        /// they rebind the thought cabinet, and a blind player cannot check the game's
+        /// control screen to find out. Empty until RunOnce has succeeded.
+        /// </summary>
+        private static readonly Dictionary<string, List<string>> keysByAction =
+            new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        private static void CacheKeysByAction(Dictionary<string, List<string>> gameBindings)
+        {
+            keysByAction.Clear();
+            foreach (var kvp in gameBindings)      // key -> actions
+            {
+                foreach (var action in kvp.Value)  // invert to action -> keys
+                {
+                    if (!keysByAction.TryGetValue(action, out var keys))
+                    {
+                        keys = new List<string>();
+                        keysByAction[action] = keys;
+                    }
+                    keys.Add(kvp.Key);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The key the GAME has bound to one of its own actions (e.g. "ThoughtCabinet"),
+        /// ready to be spoken, or null when the bindings were never readable. Returns the
+        /// first binding only: announcements want one key to press, not a list, and the
+        /// first is the primary one the game itself lists first.
+        /// </summary>
+        public static string GetGameKeyFor(string actionName)
+        {
+            if (string.IsNullOrEmpty(actionName)) return null;
+            if (!keysByAction.TryGetValue(actionName, out var keys) || keys.Count == 0) return null;
+
+            // InControl spells its key names lowercase ("t", "leftcontrol"); a single
+            // letter reads better uppercased, longer names are left as the game spells
+            // them rather than guessed at.
+            var key = keys[0];
+            return key.Length == 1 ? key.ToUpperInvariant() : key;
         }
 
         /// <summary>Map of normalized key name -> game action names bound to it.</summary>

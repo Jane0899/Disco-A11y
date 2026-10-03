@@ -60,6 +60,9 @@ namespace AccessibilityMod.Settings
             ["Instigators-lair-int"] = ("The hideout", "Das Versteck"),
             ["Capeside-wcw-int"] = ("A family flat in the apartments", "Eine Familienwohnung im Wohnblock"),
             ["Doomed-commerce-int-s1"] = ("Behind the doomed commercial area", "Hinter dem verfluchten Gewerbeblock"),
+            // Without this the raw scene name was read out as "Dream 2" - half English and
+            // a number that means nothing to the player.
+            ["Dream-2"] = ("A dream", "Ein Traum"),
         };
 
         /// <summary>The area's spoken name, or null - then the caller falls back to the scene name.</summary>
@@ -175,6 +178,22 @@ namespace AccessibilityMod.Settings
             ["Doomed-commerce-int-s1"] = (
                 "The yard behind the shops: bare concrete, a brick wall, pipes and a rusty tank, planks and junk lying about. It is dark back here, lit only from the doorway.",
                 "Der Hof hinter den Läden: nackter Beton, eine Ziegelwand, Rohre und ein rostiger Tank, dazwischen Bretter und Gerümpel. Hier hinten ist es dunkel, Licht kommt nur aus der Tür."),
+
+            // Dream sequences need the first-impression rule MORE strictly, not less: the
+            // whole scene is story, so this stays purely the stage - light, ground, fences,
+            // where the ground leads - and names nothing that happens there. What it does
+            // add, because a dream takes it away without saying so, is that the HUD is gone
+            // and that the game offers only one interactive point at a time (verified live
+            // 04.09.2026: the object registry held exactly one entry, and a different one
+            // depending on where the player stood - which is why searching the categories
+            // for anything else turns up empty).
+            // Only Dream-2 is described here. The other two dream scenes (Dream-3-ext,
+            // Dream-3-int) have deliberately been left out until someone has actually stood
+            // in them - see the file header: a plausible-sounding wrong description is worse
+            // than none, because the player cannot catch the error.
+            ["Dream-2"] = (
+                "A dream: a dark, deserted night version of Martinaise, with no status bars and no toolbar. From the square in front of the hostel, with its black puddles and a single lit alley, the ground leads north into a backyard with a plank fence and a bare tree; the game offers only one point at a time that you can do anything with.",
+                "Ein Traum: eine dunkle, menschenleere Nachtfassung von Martinaise, ohne Anzeigen und ohne Bedienleiste. Vom Platz vor dem Gasthaus mit seinen schwarzen Pfützen und einer einzelnen beleuchteten Gasse führt der Weg nach Norden in einen Hinterhof mit Bretterzaun und kahlem Baum; das Spiel gibt dabei immer nur einen einzigen Punkt frei, mit dem sich etwas machen lässt."),
         };
 
         /// <summary>

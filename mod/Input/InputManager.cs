@@ -93,6 +93,8 @@ namespace AccessibilityMod.Input
             // active; a blocked key speaks a hint instead of silently doing nothing.
             if (DialogStateManager.IsDialogUiActive)
             {
+                EnsureDialogResponseSelected();
+
                 if (IsAnyWorldNavigationKeyPressed()
                     && UnityEngine.Time.unscaledTime - lastDialogBlockHint > 3f)
                 {
@@ -184,12 +186,20 @@ namespace AccessibilityMod.Input
                     navigationSystem.SelectCategory(ObjectCategory.Everything);
             }
 
-            // Cycle categories / objects. All four share base keys in the layout-safe
-            // presets (PageUp/PageDown with and without Ctrl) and KeyBindings.IsPressed
-            // tolerates extra modifiers, so the more specific bindings (more required
-            // modifiers: Ctrl category cycling, Shift backward-cycling) must be checked
-            // before the plain ones in one else-if chain.
-            if (KeyBindings.IsPressed(GameKey.CycleCategoryBackward))
+            // Cycle categories / objects / approach sides. All six share base keys in the
+            // layout-safe presets (PageUp/PageDown with Ctrl, Shift, or nothing) and
+            // KeyBindings.IsPressed tolerates extra modifiers, so the more specific
+            // bindings (more required modifiers: Ctrl category cycling, Shift approach-side
+            // cycling) must be checked before the plain ones in one else-if chain.
+            if (KeyBindings.IsPressed(GameKey.CycleApproachSideBackward))
+            {
+                navigationSystem.CycleApproachSide(backward: true);
+            }
+            else if (KeyBindings.IsPressed(GameKey.CycleApproachSideForward))
+            {
+                navigationSystem.CycleApproachSide(backward: false);
+            }
+            else if (KeyBindings.IsPressed(GameKey.CycleCategoryBackward))
             {
                 navigationSystem.CycleCategory(backward: true);
             }
@@ -263,19 +273,9 @@ namespace AccessibilityMod.Input
                     Inventory.InventoryNavigationHandler.Instance.SwitchTab(backward: false);
             }
 
-            // Healing keys (Ctrl+H health, Shift+H morale - digits are off limits, the
-            // game reads them in dialogue regardless of Ctrl; see KeyBindings). Both
-            // share base key H with the plain-H status announcement, which yields to
-            // them in HandleDialogSafeKeys (specific-binding-first rule). The else-if
-            // also breaks the Ctrl+Shift+H tie in favour of health.
-            if (KeyBindings.IsPressed(GameKey.HealHealth))
-            {
-                Patches.HealingKeyActions.HealHealth();
-            }
-            else if (KeyBindings.IsPressed(GameKey.HealMorale))
-            {
-                Patches.HealingKeyActions.HealMorale();
-            }
+            // Healing keys live in HandleDialogSafeKeys (below) so they also work while
+            // a conversation is up - the game itself expects that (see the comment on
+            // IsAnyWorldNavigationKeyPressed).
 
             HandleDialogSafeKeys();
 
@@ -363,6 +363,46 @@ namespace AccessibilityMod.Input
             }
         }
 
+        /// <summary>
+        /// Safety net for a rare but confirmed freeze (Jana, 19.07.2026): a modal
+        /// notification (the game's own "MORAL KRITISCH! HEILE DICH SOFORT!" popped up
+        /// mid-conversation, ~9 s gap in the dialogue log where nothing advanced) can
+        /// apparently clear the EventSystem's selected object without the dialogue
+        /// system reclaiming it afterward - Enter (Unity's Submit) then does nothing
+        /// because nothing is selected to submit to. The player happened to unstick it
+        /// by opening the game's own Inventory (I, not one of our keys) - that forces a
+        /// fresh EventSystem selection elsewhere and back, which is exactly what this
+        /// makes automatic instead of accidental. Cheap: FindObjectsOfType only runs on
+        /// the rare frame where the selection is already gone (a plain null/inactive
+        /// check otherwise), not every frame the dialogue is open.
+        /// </summary>
+        private static void EnsureDialogResponseSelected()
+        {
+            try
+            {
+                var eventSystem = EventSystem.current;
+                if (eventSystem == null) return;
+
+                var current = eventSystem.currentSelectedGameObject;
+                if (current != null && current.activeInHierarchy) return; // selection is fine
+
+                var buttons = UnityEngine.Object.FindObjectsOfType<Il2Cpp.SunshineResponseButton>();
+                foreach (var button in buttons)
+                {
+                    if (button != null && button.gameObject.activeInHierarchy)
+                    {
+                        eventSystem.SetSelectedGameObject(button.gameObject);
+                        MelonLogger.Msg("[DIALOG] Restored lost EventSystem selection to a response button");
+                        break;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"[DIALOG] EnsureDialogResponseSelected failed: {ex.Message}");
+            }
+        }
+
         /// <summary>True when a key was pressed whose action is suppressed while the dialogue UI is up.</summary>
         private bool IsAnyWorldNavigationKeyPressed() =>
             KeyBindings.IsPressed(GameKey.SelectNpcs) || KeyBindings.IsPressed(GameKey.SelectLocations)
@@ -373,10 +413,14 @@ namespace AccessibilityMod.Input
             || KeyBindings.IsPressed(GameKey.CreateWaypoint) || KeyBindings.IsPressed(GameKey.FocusWaypoints)
             || KeyBindings.IsPressed(GameKey.DeleteWaypoint) || KeyBindings.IsPressed(GameKey.ToggleSortingMode)
             || KeyBindings.IsPressed(GameKey.ScanSceneByDistance)
-            // Healing is world-only too (the HUD with its plus buttons is gone during
-            // dialogue) - listing it here gives a blocked Ctrl+H/Shift+H the same spoken
-            // "in dialogue" hint instead of silence.
-            || KeyBindings.IsPressed(GameKey.HealHealth) || KeyBindings.IsPressed(GameKey.HealMorale);
+            || KeyBindings.IsPressed(GameKey.CycleApproachSideForward) || KeyBindings.IsPressed(GameKey.CycleApproachSideBackward);
+            // Healing is NOT listed here (bug, Jana 19.07.2026): the health/morale bars
+            // and their plus buttons stay up during dialogue - proven by the game's own
+            // "MORAL KRITISCH! HEILE DICH SOFORT!" notification firing mid-conversation,
+            // which would make no sense if healing were physically impossible right
+            // then. The earlier assumption ("HUD is gone during dialogue") was wrong and
+            // cost a real player a morale point they had no way to prevent. Healing is
+            // handled in HandleDialogSafeKeys instead, so it works in both contexts.
 
         /// <summary>
         /// Keys that make sense both in the world and while the dialogue UI is up:
@@ -384,6 +428,24 @@ namespace AccessibilityMod.Input
         /// </summary>
         private void HandleDialogSafeKeys()
         {
+            // Healing keys (Ctrl+H health, Shift+H morale - digits are off limits, the
+            // game reads them in dialogue regardless of Ctrl; see KeyBindings). Checked
+            // FIRST and unconditionally here - in the world AND during a conversation -
+            // because the health/morale HUD stays up and clickable throughout a dialogue
+            // (confirmed by the game's own "MORAL KRITISCH! HEILE DICH SOFORT!"
+            // notification firing mid-conversation; a player who could not act on it
+            // lost a morale point for nothing, 19.07.2026). The else-if breaks the
+            // Ctrl+Shift+H tie in favour of health; the AnnounceStatus check below
+            // yields to both via its own guard (specific-binding-first rule).
+            if (KeyBindings.IsPressed(GameKey.HealHealth))
+            {
+                Patches.HealingKeyActions.HealHealth();
+            }
+            else if (KeyBindings.IsPressed(GameKey.HealMorale))
+            {
+                Patches.HealingKeyActions.HealMorale();
+            }
+
             // Toggle dialog reading mode
             if (KeyBindings.IsPressed(GameKey.ToggleDialogReading))
             {

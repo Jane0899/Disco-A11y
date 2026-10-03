@@ -487,6 +487,19 @@ namespace AccessibilityMod.Navigation
 
             try
             {
+                // Trigger zones (NavigableAreaTrigger) have no interaction radius, no
+                // click handler, no "walk there first" concept - just Interact(). Firing
+                // it directly regardless of distance IS the accessible equivalent of
+                // physically walking into an invisible zone's exact bounds, which has no
+                // accessible equivalent otherwise (see todos.md J7).
+                var areaTrigger = stateManager.GetCurrentSelectedAreaTrigger();
+                if (areaTrigger != null)
+                {
+                    MelonLogger.Msg($"[SMART NAV] Interacting with area trigger: {areaTrigger.Name}");
+                    areaTrigger.Interact();
+                    return;
+                }
+
                 var selectedObject = stateManager.GetCurrentSelectedObject();
                 if (selectedObject == null)
                 {
@@ -552,7 +565,14 @@ namespace AccessibilityMod.Navigation
                 MelonLogger.Msg($"[SMART NAV] InteractFirstActive on {objectName}: {interacted}");
                 if (!interacted && !locked)
                 {
-                    TolkScreenReader.Instance.Speak($"Cannot interact with {objectName} right now.", true);
+                    // A finished, unconfirmed thought makes the game refuse EVERY
+                    // interaction (J11) - so "cannot interact with X" names the symptom
+                    // and hides the one thing the player has to do about it. When that is
+                    // what is going on, say so instead; the wording carries the game's
+                    // own thought cabinet key, read live.
+                    string blockedByThought = Patches.PendingThoughtWatcher.GetBlockedInteractionMessage(objectName);
+                    TolkScreenReader.Instance.Speak(
+                        blockedByThought ?? $"Cannot interact with {objectName} right now.", true);
                 }
             }
             catch (Exception ex)
@@ -592,15 +612,39 @@ namespace AccessibilityMod.Navigation
                     return;
                 }
 
-                var selectedObject = stateManager.GetCurrentSelectedObject();
-                if (selectedObject == null || selectedObject.transform == null)
+                var areaTrigger = stateManager.GetCurrentSelectedAreaTrigger();
+                Vector3 destination;
+                Quaternion rotation;
+                string objectName;
+                if (areaTrigger != null)
                 {
-                    TolkScreenReader.Instance.Speak($"No object selected. Select a category first, then use {KeyBindings.SpeakableName(GameKey.CycleForward)} to cycle.", true);
-                    return;
+                    destination = areaTrigger.Position;
+                    rotation = areaTrigger.Rotation;
+                    objectName = areaTrigger.Name;
+                }
+                else
+                {
+                    var selectedObject = stateManager.GetCurrentSelectedObject();
+                    if (selectedObject == null || selectedObject.transform == null)
+                    {
+                        TolkScreenReader.Instance.Speak($"No object selected. Select a category first, then use {KeyBindings.SpeakableName(GameKey.CycleForward)} to cycle.", true);
+                        return;
+                    }
+
+                    destination = selectedObject.transform.position;
+                    rotation = selectedObject.transform.rotation;
+                    objectName = ObjectNameCleaner.GetBetterObjectName(selectedObject);
                 }
 
-                Vector3 destination = selectedObject.transform.position;
-                string objectName = ObjectNameCleaner.GetBetterObjectName(selectedObject);
+                // Jana's idea (01.08.2026, todos.md J7): an approach side chosen via
+                // CycleApproachSide overrides the object's own single interaction point -
+                // some objects only react correctly from a particular side.
+                var approachOverride = stateManager.GetApproachOverridePosition(destination, rotation);
+                if (approachOverride != null)
+                {
+                    destination = approachOverride.Value;
+                    objectName = $"{objectName} ({stateManager.CurrentApproachSideName})";
+                }
 
                 MelonLogger.Msg($"[SMART NAV] Attempting to navigate to {objectName}");
                 TolkScreenReader.Instance.Speak($"Calculating path to {objectName}...", true);
@@ -619,6 +663,54 @@ namespace AccessibilityMod.Navigation
         public void StopMovement()
         {
             movementController.StopMovement();
+        }
+
+        /// <summary>
+        /// Shift+PageDown/PageUp: cycles which side of the current selection "navigate to"
+        /// walks you to (Jana's idea, 01.08.2026, todos.md J7 - a car's headlights only
+        /// illuminate what is in front of it, and the object's default single interaction
+        /// point is not always that side). Announces the new side and whether it is
+        /// reachable on foot, same "tell the player before they walk into a wall" spirit as
+        /// the rest of navigation - cycling costs nothing, so speaking every step is fine.
+        /// </summary>
+        public void CycleApproachSide(bool backward)
+        {
+            try
+            {
+                stateManager.CycleApproachSide(backward);
+
+                Vector3 destination;
+                Quaternion rotation;
+                var areaTrigger = stateManager.GetCurrentSelectedAreaTrigger();
+                if (areaTrigger != null)
+                {
+                    destination = areaTrigger.Position;
+                    rotation = areaTrigger.Rotation;
+                }
+                else
+                {
+                    var selectedObject = stateManager.GetCurrentSelectedObject();
+                    if (selectedObject == null || selectedObject.transform == null)
+                    {
+                        TolkScreenReader.Instance.Speak("No object selected.", true);
+                        return;
+                    }
+                    destination = selectedObject.transform.position;
+                    rotation = selectedObject.transform.rotation;
+                }
+
+                var overridePos = stateManager.GetApproachOverridePosition(destination, rotation);
+                Vector3 checkPos = overridePos ?? destination;
+                Vector3 playerPos = GameObjectUtils.GetPlayerPosition();
+                bool? reachable = playerPos != Vector3.zero ? ReachabilityChecker.IsReachable(playerPos, checkPos) : null;
+                string reachabilityHint = reachable == false ? " Not reachable on foot from here." : "";
+
+                TolkScreenReader.Instance.Speak($"{stateManager.CurrentApproachSideName}.{reachabilityHint} Press {KeyBindings.SpeakableName(GameKey.NavigateToSelected)} to walk there.", true);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"[SMART NAV] CycleApproachSide error: {ex}");
+            }
         }
 
         public void UpdateMovement()

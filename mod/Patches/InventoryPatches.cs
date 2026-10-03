@@ -215,6 +215,71 @@ namespace AccessibilityMod.Patches
     public static class InventoryHighlighterHelper
     {
         /// <summary>
+        /// The spoken refusal for an item that has no equipment slot at all, or null when
+        /// the item either IS equippable or we simply cannot tell.
+        ///
+        /// The game decides this purely by ItemType: HELD goes in a hand, SHIRT/JACKET/
+        /// COAT/PANTS/NECK/GLASSES/GLOVES/HAT/SHOES/ARMOR go on the body, and anything
+        /// else has no slot - pawn goods, books, the map, the tape spools. The inventory
+        /// TAB an item sits in says nothing about this (a "pawnable" is a group, not a
+        /// type), which is exactly why it looks arbitrary from the outside.
+        ///
+        /// Deliberately a POSITIVE whitelist rather than "== NONE": live data shows real
+        /// items carrying a type value that our decompiled ItemType enum does not even
+        /// name (it stops at NONE), so testing for the known-equippable values is the only
+        /// test that stays correct when the enum has more members than we can see.
+        /// Anything we cannot resolve returns null and stays silent - a wrong "cannot be
+        /// equipped" on an item that actually equips would be worse than no message.
+        /// </summary>
+        private static string DescribeIfNotEquippable(GameObject go)
+        {
+            try
+            {
+                if (go == null) return null;
+
+                // Not on the pawn shop screen (Jana's decision, 04.09.2026). Our
+                // IsInventoryViewOpen covers INVENTORY and INVENTORY_PAWN alike, so this
+                // code runs there too - but there the player is buying and selling, not
+                // dressing. "Cannot be equipped" would answer a question nobody asked and
+                // sound like the trade itself had failed. Silence is the honest answer
+                // until someone has actually worked out what the key does there.
+                if (InventoryNavigationHandler.IsPawnShopOpen) return null;
+
+                var slot = go.GetComponent<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>()
+                           ?? go.GetComponentInChildren<Il2CppDiscoPages.Elements.Inventory.InventoryItemSlot>();
+                var item = slot?.item;
+                if (item == null) return null; // empty cell, equipment slot, or not resolvable
+
+                switch (item.type)
+                {
+                    case Il2Cpp.ItemType.HELD:
+                    case Il2Cpp.ItemType.ARMOR:
+                    case Il2Cpp.ItemType.SHIRT:
+                    case Il2Cpp.ItemType.JACKET:
+                    case Il2Cpp.ItemType.COAT:
+                    case Il2Cpp.ItemType.PANTS:
+                    case Il2Cpp.ItemType.NECK:
+                    case Il2Cpp.ItemType.GLASSES:
+                    case Il2Cpp.ItemType.GLOVES:
+                    case Il2Cpp.ItemType.HAT:
+                    case Il2Cpp.ItemType.SHOES:
+                        return null; // has a slot - the equip attempt is legitimate
+                }
+
+                string name = !string.IsNullOrEmpty(item.displayName)
+                    ? RTLHelper.FixForScreenReader(item.displayName)
+                    : RTLHelper.FixForScreenReader(slot.itemName ?? "");
+                return Settings.Loc.Get("ItemNotEquippable", name);
+            }
+            catch (Exception ex)
+            {
+                // Never let a diagnostic message break the activation itself.
+                MelonLogger.Warning($"[Inventory] DescribeIfNotEquippable failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// The item text for a selected inventory GameObject, or null if the object is
         /// not an inventory slot at all (so the caller can fall through to other UI).
         /// Shared by the OnSelect announcement and the on-demand "announce current
@@ -289,18 +354,34 @@ namespace AccessibilityMod.Patches
                     return;
                 }
 
+                // The game itself already ships a keyboard path for this: TooltipSource
+                // (sits on every slot alongside InventoryHighlighter) has ShowTooltip(bool
+                // setByKeyboard), separate from the mouse-only OnPointerEnter/OnPointerExit
+                // on the same component. Keyboard selection (OnSelect) never calls it, so
+                // InventoryTooltip.interactButton stays unpopulated for a keyboard-only
+                // player - confirmed live: F on the case-file/ledger's equipment slot fell
+                // through to the wrong UIDragDock.OnSubmit path (a drag-drop confirm with
+                // no keyboard meaning at all, not the game's Submit action - it takes no
+                // event data, so it can't be an ISubmitHandler) and silently did nothing.
+                // Calling ShowTooltip(true) here mirrors what a mouse hover does, for grid
+                // slots too (already working there via a different path, so harmless).
                 // Ownership check, the same one GetSelectionText uses: only a real
-                // inventory slot carries an InventoryHighlighter. It matters here because
+                // inventory slot carries an InventoryHighlighter. It matters because
                 // InventoryTooltip is a SINGLETON belonging to whichever item was last
                 // shown - it is not tied to the current keyboard focus, and Unity tooltips
-                // appear and disappear on hover, not in lockstep with focus. Without this
-                // guard, moving focus on to a plain button (close, sort) while the previous
-                // item's tooltip is still active would make this key click the OLD item's
-                // interact button instead of the button the player is actually standing on -
-                // worst case starting a conversation instead of closing the inventory
-                // (PR review, Danijel 14.08.2026). Non-slots skip straight to the generic
-                // Button path below, which clicks exactly what is focused.
+                // follow hover, not focus. Without this guard, moving focus on to a plain
+                // button (close, sort) while the previous item's tooltip is still active
+                // would make this key click the OLD item's interact button instead of the
+                // button the player is actually standing on - worst case starting a
+                // conversation instead of closing the inventory (PR review, Danijel
+                // 14.08.2026). Non-slots skip straight to the generic Button path below,
+                // which clicks exactly what is focused.
                 bool isInventorySlot = selected.GetComponent<Il2Cpp.InventoryHighlighter>() != null;
+
+                var tooltipSource = isInventorySlot
+                    ? selected.GetComponent<Il2CppSunshine.TooltipSource>()
+                    : null;
+                tooltipSource?.ShowTooltip(true);
 
                 var tooltip = isInventorySlot ? InventoryTooltip.Singleton : null;
                 var interactButton = tooltip?.interactButton;
@@ -315,8 +396,23 @@ namespace AccessibilityMod.Patches
                 var dragDock = selected.GetComponent<Il2CppSunshine.UIDragDock>();
                 if (dragDock != null)
                 {
+                    // This same call is what successfully equips a prybar or a flashlight,
+                    // so it always runs - but for an item with no equipment slot at all it
+                    // does nothing AND says nothing, which a blind player cannot tell apart
+                    // from a dead key (Jana, 04.09.2026: "why can't I put the pawn items in
+                    // my hand?"). A successful equip already announces itself through the
+                    // game's own DockItem patch above, so the only missing half is the
+                    // refusal - say it, with the item's name, and let the call proceed
+                    // regardless in case the game does something else with it.
+                    string notEquippable = DescribeIfNotEquippable(selected);
+
                     dragDock.OnSubmit();
                     MelonLogger.Msg($"[Inventory] Activated slot via UIDragDock.OnSubmit: {selected.name}");
+
+                    if (notEquippable != null)
+                    {
+                        TolkScreenReader.Instance.Speak(notEquippable, true);
+                    }
                     return;
                 }
 

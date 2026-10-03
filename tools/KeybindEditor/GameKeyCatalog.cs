@@ -64,5 +64,7 @@ public static class GameKeyCatalog
         new("HealHealth", "Use a health healing charge", "Gesundheits-Heilladung verwenden", "H|True|False|False", "H|True|False|False", "H|True|False|False"),
         new("HealMorale", "Use a morale healing charge", "Moral-Heilladung verwenden", "H|False|False|True", "H|False|False|True", "H|False|False|True"),
         new("CloseSplash", "Close the thought research screen", "Forschungsergebnis-Bildschirm schließen", "Return|False|False|False", "Return|False|False|False", "Return|False|False|False"),
+        new("CycleApproachSideForward", "Next approach side (front/right/back/left of selection)", "Nächste Anfahrtsseite (vorne/rechts/hinten/links am Ziel)", "PageDown|False|False|True", "PageDown|False|False|True", "PageDown|False|False|True"),
+        new("CycleApproachSideBackward", "Previous approach side", "Vorherige Anfahrtsseite", "PageUp|False|False|True", "PageUp|False|False|True", "PageUp|False|False|True"),
     };
 }

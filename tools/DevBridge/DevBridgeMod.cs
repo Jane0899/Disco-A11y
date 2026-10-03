@@ -327,6 +327,8 @@ namespace DevBridge
                            "modkey <GameKey> | modkeys (fire one of the mod's own hotkeys)\n" +
                            "select npcs|locations|loot|all | cycle [back] | category next|prev\n" +
                            "navigate | interact | stop | announce\n" +
+                           "buttons | click <label> | selectui <label> (like click, but sets EventSystem focus instead of firing onClick)\n" +
+                           "ui down|up|left|right|submit|cancel | inspect (drive/inspect the currently selected UI element)\n" +
                            "dialog | continue\n" +
                            "teleport <x> <y> <z> | goto <scene> <marker> | scenes\n" +
                            "destinations | travel <destinationId> | view [type]\n" +
@@ -654,26 +656,154 @@ namespace DevBridge
                     return sb.ToString().TrimEnd();
                 }
 
+                // "Why can't I put this in my hand?" (Jana, 04.09.2026). An item is
+                // equippable only where its ItemType names a slot - HELD for hands, SHIRT/
+                // JACKET/... for clothing, NONE for things that go in no slot at all. The
+                // inventory TAB it sits in (ItemGroup: TOOLS, CLOTHES, PAWNABLES, READING)
+                // says nothing about that, which is exactly the confusion this answers:
+                // a pawnable is a tab, not a type. Reads the game's own item library, so
+                // this is ground truth rather than inference from the item's name.
+                // With no argument it dumps every owned item; with one it filters by
+                // substring (internal name or display name).
+                case "iteminfo":
+                {
+                    string needle = parts.Length > 1
+                        ? string.Join(" ", parts.Skip(1)).ToLowerInvariant()
+                        : null;
+
+                    var invData = Il2CppSunshine.Metric.InventoryViewData.Singleton;
+                    if (invData == null) return "InventoryViewData.Singleton is null";
+                    var library = invData.GetLibrary();
+                    if (library == null) return "item library is null";
+
+                    var sb = new StringBuilder();
+                    var tabs = invData.tabContents;
+                    if (tabs == null) return "tabContents: null";
+
+                    int shown = 0;
+                    foreach (var tab in tabs)
+                    {
+                        var slots = tab.Value;
+                        if (slots == null) continue;
+                        foreach (var slot in slots)
+                        {
+                            string rawName = slot.Value;
+                            if (string.IsNullOrEmpty(rawName)) continue;
+
+                            var item = library.GetByName(rawName);
+                            string display = item != null && !string.IsNullOrEmpty(item.displayName)
+                                ? item.displayName : rawName;
+
+                            if (needle != null
+                                && !rawName.ToLowerInvariant().Contains(needle)
+                                && !display.ToLowerInvariant().Contains(needle)) continue;
+
+                            if (item == null)
+                            {
+                                sb.AppendLine($"  {rawName} (tab {tab.Key}) - NOT FOUND in library");
+                            }
+                            else
+                            {
+                                // type == HELD is the whole answer to "can this go in a hand".
+                                bool handable = item.type == Il2Cpp.ItemType.HELD;
+                                sb.AppendLine($"  {rawName} \"{display}\" | tab(group)={item.group} | type={item.type} | hand-equippable={handable}");
+                            }
+                            shown++;
+                        }
+                    }
+
+                    if (shown == 0) return needle == null ? "no items owned" : $"no owned item matches '{needle}'";
+                    return $"{shown} item(s):\n" + sb.ToString().TrimEnd();
+                }
+
                 case "thought":
                 {
-                    // Test rig for bug #57 (thought cabinet completion): "thought list"
-                    // shows every ThoughtCabinetProject with its state; "thought discover
-                    // <namepart>" finishes one through the game's own research-completed
-                    // path (CharacterThoughts.DiscoverThought), so the real splash flow
-                    // runs - no waiting for in-game hours to pass.
+                    // Test rig for the thought cabinet (bug #57, and J11: a finished but
+                    // unconfirmed thought silently blocks EVERY interaction).
+                    //
+                    // "thought list" shows every ThoughtCabinetProject with the three
+                    // markers that together say "finished and still unconfirmed":
+                    //   state  - UNKNOWN/KNOWN/COOKING/DISCOVERED/FIXED/FORGOTTEN
+                    //   fresh  - the game's own "player has not looked at this yet" flag,
+                    //            the orange dot on the cabinet button in numeric form
+                    //   plus, in the header, CharacterThoughts.FreshCount and
+                    //   ThoughtManager.WillShowSplashScreenInstead() - the latter is the
+                    //   game's own name for "a splash is queued, show it INSTEAD of the
+                    //   normal interaction", i.e. the prime suspect for the J11 block.
+                    // state alone is provably not the signal: after J11 was resolved, two
+                    // thoughts sat at FIXED and nothing was blocked (live, 25.09.2026).
+                    //
+                    // WARNING about "thought discover": CharacterThoughts.DiscoverThought
+                    // has ZERO callers in the game (checked in the class dump) - it is a
+                    // path the game itself never takes, so a test through it proves
+                    // nothing about the real flow. "thought fix" uses FixThought instead,
+                    // which the game calls from four places, and is the honest way to
+                    // reproduce a finished thought on demand.
                     var sheet = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Metric.CharacterSheet>();
                     if (sheet == null || sheet.thoughts == null) return "CharacterSheet/thoughts not found";
 
                     var projects = UnityEngine.Object.FindObjectsOfType<Il2CppSunshine.Metric.ThoughtCabinetProject>(true);
-                    if (parts.Length < 2 || parts[1] == "list")
+                    if (parts.Length < 2 || parts[1] == "list" || parts[1] == "pending")
                     {
                         var sb = new StringBuilder();
+
+                        // Header first: the two global markers. Each is read defensively -
+                        // a diagnostic that dies on one null teaches nothing about the rest.
+                        string freshCount;
+                        try { freshCount = sheet.thoughts.FreshCount.ToString(); }
+                        catch (Exception ex) { freshCount = "ERR " + ex.Message; }
+
+                        string willSplash;
+                        try { willSplash = Il2CppSunshine.ThoughtManager.WillShowSplashScreenInstead().ToString(); }
+                        catch (Exception ex) { willSplash = "ERR " + ex.Message; }
+
+                        sb.AppendLine($"FreshCount={freshCount}  WillShowSplashScreenInstead={willSplash}");
+
+                        // "pending" is the short answer for a watcher loop: only the
+                        // thoughts that are finished AND still flagged fresh, which is the
+                        // candidate condition for "this is what is blocking you".
+                        bool onlyPending = parts.Length >= 2 && parts[1] == "pending";
+
                         foreach (var p in projects)
                         {
                             if (p == null) continue;
-                            sb.AppendLine($"{p.state,-10} | {p.name} | '{p.displayName}'");
+
+                            bool fresh;
+                            try { fresh = p.fresh; }
+                            catch { fresh = false; }
+
+                            bool finished = p.state == Il2CppSunshine.Metric.ThoughtState.DISCOVERED
+                                         || p.state == Il2CppSunshine.Metric.ThoughtState.FIXED;
+
+                            if (onlyPending && !(fresh && finished)) continue;
+
+                            sb.AppendLine($"{p.state,-10} | fresh={fresh,-5} | {p.name} | '{p.displayName}'");
                         }
-                        return sb.Length == 0 ? "(no thoughts found)" : sb.ToString().TrimEnd();
+                        return sb.ToString().TrimEnd();
+                    }
+
+                    if (parts[1] == "fix" && parts.Length >= 3)
+                    {
+                        // The game's REAL research-completed call (4 call sites), as
+                        // opposed to DiscoverThought (0). This is how J11 is reproduced
+                        // on demand instead of waiting for in-game research hours.
+                        // It changes the character sheet, so it belongs on a backup save.
+                        string part = string.Join(" ", parts.Skip(2)).ToLowerInvariant();
+                        var target = projects.FirstOrDefault(p => p != null &&
+                            ((p.displayName ?? "").ToLowerInvariant().Contains(part)
+                             || (p.name ?? "").ToLowerInvariant().Contains(part)));
+                        if (target == null) return $"no thought matching '{part}'";
+
+                        var stateBefore = target.state;
+                        sheet.thoughts.FixThought(target);
+
+                        string willAfter;
+                        try { willAfter = Il2CppSunshine.ThoughtManager.WillShowSplashScreenInstead().ToString(); }
+                        catch (Exception ex) { willAfter = "ERR " + ex.Message; }
+
+                        return $"FixThought('{target.displayName}'): state {stateBefore} -> {target.state}, "
+                             + $"fresh={target.fresh}, FreshCount={sheet.thoughts.FreshCount}, "
+                             + $"WillShowSplashScreenInstead={willAfter}";
                     }
 
                     if ((parts[1] == "discover" || parts[1] == "splash") && parts.Length >= 3)
@@ -707,7 +837,12 @@ namespace DevBridge
                         return $"DiscoverThought('{target.displayName}') called (state before: {before}, now: {target.state})";
                     }
 
-                    return "usage: thought [list | discover <namepart> | splash <namepart>]";
+                    return "usage: thought [list | pending | fix <namepart> | discover <namepart> | splash <namepart>]\n"
+                         + "  list    - every thought with state + fresh flag, header has FreshCount/WillShowSplashScreenInstead\n"
+                         + "  pending - only thoughts that are finished AND still fresh (the J11 candidate condition)\n"
+                         + "  fix     - complete one through the game's real path (FixThought); CHANGES THE SAVE\n"
+                         + "  discover- CharacterThoughts.DiscoverThought; note: 0 callers in the game, proves nothing\n"
+                         + "  splash  - queue + run the splash screen for one thought";
                 }
 
                 case "pages":
@@ -847,6 +982,83 @@ namespace DevBridge
                     return $"no button matching '{needle}'";
                 }
 
+                // Directly calls the same method the mod's own InteractWithSelected key
+                // calls once IsInventoryViewOpen is true (InputManager.cs). 'modkey
+                // InteractWithSelected' cannot be used for this: InputManager checks that
+                // GameKey twice per Update (once for the thought-splash-close guard, once
+                // for the real dispatch), and the bridge's key injection is consumed by the
+                // first check that reads it - a real keypress stays "down" for the whole
+                // frame so this never affects a real player, only bridge-simulated keys
+                // that get checked more than once per frame.
+                case "activateslot":
+                    InventoryHighlighterHelper.ActivateSelectedSlot();
+                    return "ActivateSelectedSlot() called directly";
+
+                // Diagnostic for the case-file/ledger "F does nothing" puzzle (31.07.2026):
+                // dumps InventoryTooltip.interactButton state, calls InventoryHighlighter.
+                // OnPointerEnter directly (bypassing ExecuteEvents entirely, in case IL2CPP
+                // interop doesn't resolve the interface for Execute<IPointerEnterHandler>),
+                // then dumps the tooltip state again to see whether that's what populates it.
+                case "tooltipdiag":
+                {
+                    var es = UnityEngine.EventSystems.EventSystem.current;
+                    var sel = es?.currentSelectedGameObject;
+                    if (sel == null) return "(nothing selected)";
+
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"selected: {sel.name}");
+
+                    var tt = Il2CppSunshine.InventoryTooltip.Singleton;
+                    sb.AppendLine($"InventoryTooltip.Singleton: {(tt == null ? "null" : "present")}");
+                    var before = tt?.interactButton;
+                    sb.AppendLine($"interactButton BEFORE: {(before == null ? "null" : $"active={before.gameObject.activeInHierarchy} interactable={before.interactable}")}");
+
+                    // Not on the slot GameObject itself (confirmed via 'inventory' dump -
+                    // only RectTransform/Button/UIDragDock/InventoryHighlighter there), so
+                    // search the hierarchy: parents first (wrapper container is the more
+                    // common Unity pattern), then children.
+                    var tooltipSource = sel.GetComponentInParent<Il2CppSunshine.TooltipSource>()
+                        ?? sel.GetComponentInChildren<Il2CppSunshine.TooltipSource>();
+                    sb.AppendLine($"TooltipSource (parent-or-child search): {(tooltipSource == null ? "null" : tooltipSource.gameObject.name)}");
+                    if (tooltipSource != null)
+                    {
+                        tooltipSource.ShowTooltip(true);
+                        sb.AppendLine("called ShowTooltip(true)");
+                    }
+
+                    var tt2 = Il2CppSunshine.InventoryTooltip.Singleton;
+                    var after = tt2?.interactButton;
+                    sb.AppendLine($"interactButton AFTER: {(after == null ? "null" : $"active={after.gameObject.activeInHierarchy} interactable={after.interactable}")}");
+                    return sb.ToString().TrimEnd();
+                }
+
+                // Sets real EventSystem focus on a Selectable by (child-text or GameObject)
+                // name, same lookup as 'click' but calling SetSelectedGameObject instead of
+                // onClick.Invoke(). Needed because 'click' only fires the UnityEvent - a real
+                // mouse click also runs Selectable.OnPointerDown, which is what actually
+                // calls EventSystem.current.SetSelectedGameObject and makes the game populate
+                // its selection-dependent UI (e.g. InventoryTooltip.interactButton). Without
+                // this, elements that are reachable only by name (not by keyboard tab order,
+                // e.g. the equipment paperdoll slots - no GameKey moves focus there) can never
+                // be put into the state ActivateSelectedSlot expects.
+                case "selectui":
+                {
+                    if (parts.Length < 2) return "usage: selectui <selectable label or GameObject-name substring>";
+                    var needle = string.Join(" ", parts.Skip(1)).ToLowerInvariant();
+                    foreach (var s in UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.Selectable>())
+                    {
+                        if (s == null || !s.gameObject.activeInHierarchy || !s.interactable) continue;
+                        var label = s.GetComponentInChildren<Il2CppTMPro.TextMeshProUGUI>();
+                        var text = label != null && !string.IsNullOrWhiteSpace(label.text) ? label.text.Trim() : s.gameObject.name;
+                        if (text.ToLowerInvariant().Contains(needle) || s.gameObject.name.ToLowerInvariant().Contains(needle))
+                        {
+                            UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(s.gameObject);
+                            return $"selected: {s.gameObject.name} (label: {text})";
+                        }
+                    }
+                    return $"no selectable matching '{needle}'";
+                }
+
                 case "dialog":
                     return $"inConversation: {DialogStateManager.IsInConversation()}\nlastLine: {DialogSystemPatches.GetLastDialogueLine()}";
 
@@ -868,6 +1080,20 @@ namespace DevBridge
                     var target = new Vector3(float.Parse(parts[1]), float.Parse(parts[2]), float.Parse(parts[3]));
                     character.transform.position = target;
                     return $"teleported to {target.x:F2} {target.y:F2} {target.z:F2}";
+                }
+
+                // Unlike teleport (instant transform.position set, which may not reliably
+                // fire Unity trigger-collider OnTriggerEnter/Stay the way an actual walked
+                // path does), this uses the mod's own real pathfinding/movement so physics
+                // trigger detection behaves exactly as it would for a player who walked
+                // there (J7, 02.08.2026 - testing whether "halogen watermarks" needs a real
+                // walk-in, not just standing at the right coordinates).
+                case "walkto":
+                {
+                    if (parts.Length < 4) return "usage: walkto <x> <y> <z>";
+                    var target = new Vector3(float.Parse(parts[1]), float.Parse(parts[2]), float.Parse(parts[3]));
+                    nav.MovementController.TryNavigateToPosition(target, "test position");
+                    return $"walking to {target.x:F2} {target.y:F2} {target.z:F2}";
                 }
 
                 case "quickload":
@@ -1049,6 +1275,90 @@ namespace DevBridge
                         default:
                             return "usage: trace on|off|tail [n]|holders";
                     }
+                }
+
+                // J7 (todos.md): finds the actual trigger for a position-gated reveal (the
+                // Kineema headlight/ledger-signature "thought bubble") that isn't reachable
+                // through the normal object-interact system. Two candidate sources near the
+                // selected object (or player, if nothing is selected): Light components
+                // (the headlight beam itself is the most likely position source for a
+                // "stand in the light" check) and trigger colliders (isTrigger=true only -
+                // solid colliders are walls/ground/props, not reveal zones, so filtering to
+                // triggers cuts the usual noise of a cluttered scene down to plausible hits).
+                case "nearbylights":
+                {
+                    Vector3 center;
+                    var sel = nav?.StateManager?.GetCurrentSelectedObject();
+                    if (parts.Length > 1 && float.TryParse(parts[1], out _))
+                    {
+                        center = GameObjectUtils.GetPlayerPosition();
+                    }
+                    else if (sel != null)
+                    {
+                        center = sel.transform.position;
+                    }
+                    else
+                    {
+                        center = GameObjectUtils.GetPlayerPosition();
+                    }
+                    float radius = (parts.Length > 1 && float.TryParse(parts[1], out var r)) ? r : 15f;
+
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"center: {center} (radius {radius}m)");
+
+                    sb.AppendLine("--- Lights ---");
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<UnityEngine.Light>(true))
+                    {
+                        if (light == null) continue;
+                        float d = UnityEngine.Vector3.Distance(center, light.transform.position);
+                        if (d > radius) continue;
+                        sb.AppendLine($"  '{light.gameObject.name}' type={light.type} range={light.range:F1} intensity={light.intensity:F1} active={light.gameObject.activeInHierarchy} at {d:F1}m, pos={light.transform.position}");
+                    }
+
+                    sb.AppendLine("--- Trigger colliders ---");
+                    foreach (var col in UnityEngine.Object.FindObjectsOfType<UnityEngine.Collider>(true))
+                    {
+                        if (col == null || !col.isTrigger) continue;
+                        // bounds.center, not transform.position: a SphereCollider/BoxCollider
+                        // can have a local "center" offset from its transform, and the AABB
+                        // center is the only value that accounts for it - transform.position
+                        // alone can be several metres off the actual trigger volume.
+                        var trueCenter = col.bounds.center;
+                        float d = UnityEngine.Vector3.Distance(center, trueCenter);
+                        if (d > radius) continue;
+                        sb.AppendLine($"  '{col.gameObject.name}' type={col.GetIl2CppType().Name} active={col.gameObject.activeInHierarchy} at {d:F1}m, transform.pos={col.transform.position}, bounds.center={trueCenter}, bounds.size={col.bounds.size}");
+                    }
+
+                    return sb.ToString().TrimEnd();
+                }
+
+                // TEST-ONLY diagnostic (J7, 02.08.2026): force a named Light active/on with
+                // nonzero intensity, to check whether "stand in the halogen watermarks zone"
+                // alone is enough once the headlights are actually lit, without first
+                // needing to find/unlock whatever real story flag normally turns them on.
+                // Never a real fix - just answers one yes/no question fast.
+                case "forcelight":
+                {
+                    if (parts.Length < 2) return "usage: forcelight <name substring>";
+                    var needle = string.Join(" ", parts.Skip(1)).ToLowerInvariant();
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<UnityEngine.Light>(true))
+                    {
+                        if (light == null || !light.gameObject.name.ToLowerInvariant().Contains(needle)) continue;
+
+                        // SetActive(true) on the light's own GameObject is not enough if a
+                        // PARENT is disabled - activeInHierarchy stays false either way, so
+                        // walk up and enable every ancestor too.
+                        var t = light.transform;
+                        while (t != null)
+                        {
+                            if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
+                            t = t.parent;
+                        }
+                        light.enabled = true;
+                        light.intensity = light.intensity > 0.01f ? light.intensity : 5f;
+                        return $"forced on: '{light.gameObject.name}' active={light.gameObject.activeInHierarchy} intensity={light.intensity}";
+                    }
+                    return $"no light matching '{needle}'";
                 }
 
                 // Runs the mod's reachability check on the selected object, step by step,
