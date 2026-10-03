@@ -183,6 +183,13 @@ namespace AccessibilityMod.Patches
         // descriptions wait (see AccessibilityMod.SpeakPendingDescriptionIfReady).
         private static bool announcementPending;
 
+        // Consecutive polls with nothing waiting before the "already announced" memory is
+        // cleared. At one poll a second that is a few seconds of grace - long enough that
+        // a momentary wobble in the signal cannot produce a second announcement, short
+        // enough that a genuinely new thought is never held back noticeably.
+        private const int CLEAR_POLLS_NEEDED = 5;
+        private static int clearPolls;
+
         // Stand-in key for "announced, but we never learned which thought it was" - so the
         // once-only rule still holds when the name is unknown.
         private const string UNNAMED = "\u0000unnamed";
@@ -194,36 +201,46 @@ namespace AccessibilityMod.Patches
         private static readonly System.Collections.Generic.HashSet<string> lastCooking =
             new System.Collections.Generic.HashSet<string>();
 
-        // How often the cooking snapshot is refreshed while nothing is going on.
-        private const float SNAPSHOT_SECONDS = 30f;
-        private static float nextSnapshotTime;
-
-        // The character sheet carries FreshCount. Held on to rather than looked up every
-        // second: FindObjectOfType is exactly the kind of scan the cheap gate exists to
-        // avoid. Re-found when it goes away (scene change, load).
-        private static Il2CppSunshine.Metric.CharacterSheet cachedSheet;
+        // The thought projects, looked up once and kept. THIS is how the per-second cost
+        // stays down - not by skipping the check.
+        //
+        // The previous attempt gated the whole check on CharacterThoughts.FreshCount, on
+        // the assumption that it counts exactly the unseen thoughts. It does not: live on
+        // 03.10.2026 the finished thought carried fresh=True for nine minutes while
+        // FreshCount read 0 the entire time. The gate therefore closed a second after
+        // every detection and only the 30 s snapshot re-opened it, so the state flapped
+        // on a 30 s cycle - and the announcement was spoken three times instead of once,
+        // twice of them after the player had already dealt with the splash. Caching the
+        // array keeps the expensive FindObjectsOfType rare without making the ANSWER
+        // depend on a counter that does not mean what its name says.
+        private static ThoughtCabinetProject[] cachedProjects;
+        private const float PROJECT_REFRESH_SECONDS = 30f;
+        private static float nextProjectRefresh;
 
         /// <summary>
-        /// The game's count of thought-cabinet entries the player has not looked at yet -
-        /// the orange dot as a number. Returns -1 when it cannot be read, which callers
-        /// treat as "unknown, look properly" rather than "nothing there".
+        /// The thought projects, from cache. Re-found every 30 s, and immediately when the
+        /// cache is empty or has gone stale (a load destroys the old objects, which show
+        /// up as null entries through the Il2Cpp wrappers).
         /// </summary>
-        private static int ReadFreshCount()
+        private static ThoughtCabinetProject[] GetProjects()
         {
-            try
+            bool due = UnityEngine.Time.unscaledTime >= nextProjectRefresh;
+            bool stale = cachedProjects == null || cachedProjects.Length == 0;
+
+            if (!due && !stale)
             {
-                if (cachedSheet == null)
-                {
-                    cachedSheet = UnityEngine.Object.FindObjectOfType<Il2CppSunshine.Metric.CharacterSheet>();
-                }
-                if (cachedSheet == null || cachedSheet.thoughts == null) return -1;
-                return cachedSheet.thoughts.FreshCount;
+                // Cheap sanity check: one destroyed entry means the whole set is from a
+                // previous load and has to be looked up again.
+                try { stale = cachedProjects[0] == null; }
+                catch { stale = true; }
             }
-            catch
+
+            if (due || stale)
             {
-                cachedSheet = null;
-                return -1;
+                cachedProjects = UnityEngine.Object.FindObjectsOfType<ThoughtCabinetProject>(true);
+                nextProjectRefresh = UnityEngine.Time.unscaledTime + PROJECT_REFRESH_SECONDS;
             }
+            return cachedProjects;
         }
 
         /// <summary>
@@ -243,15 +260,15 @@ namespace AccessibilityMod.Patches
 
                 bool nowWaiting = CheckWaiting(out string name, out bool splashFlag, out bool freshFlag);
 
+                if (nowWaiting) clearPolls = 0; else clearPolls++;
+
                 if (nowWaiting && !waiting)
                 {
-                    // Rising edge: a thought just finished. Log the two signals SEPARATELY,
-                    // not just the combined answer - which of them actually marks the state
-                    // is still an open question, and this line is how the next real session
-                    // settles it without anyone having to reproduce the situation on
-                    // purpose. (Baseline measured live on 25.09 with nothing waiting:
-                    // WillShowSplashScreenInstead=False, FreshCount=0, and every finished
-                    // thought fresh=False - so neither signal is stuck on by default.)
+                    // Rising edge: a thought just finished. Both signals are logged
+                    // separately - that is how 03.10.2026 settled which one actually marks
+                    // the state (fresh-and-finished does; WillShowSplashScreenInstead only
+                    // reports that the splash is on screen), and it is the first thing to
+                    // read if this ever misbehaves again.
                     MelonLogger.Msg($"[THOUGHT] Finished thought waiting for confirmation: {name ?? "(name unknown)"} "
                                   + $"| WillShowSplashScreenInstead={splashFlag} | freshFinishedThought={freshFlag}");
                     announcementPending = true;
@@ -259,12 +276,24 @@ namespace AccessibilityMod.Patches
                 else if (!nowWaiting && waiting)
                 {
                     MelonLogger.Msg("[THOUGHT] Block lifted - thought confirmed");
+                }
+
+                waiting = nowWaiting;
+
+                // Forgetting what we already said is deliberately SLOW. The once-only rule
+                // lives in announcedName, and resetting it on a single quiet poll is what
+                // turned a flapping signal into three identical announcements on
+                // 03.10.2026 - two of them after the player had already dealt with the
+                // splash. Repetition is not a cosmetic flaw here: the line interrupts, so
+                // every false repeat talks over whatever the player was listening to.
+                // Requiring several consecutive quiet polls means a hiccup costs a few
+                // seconds of staleness instead of shouting at her again.
+                if (!nowWaiting && clearPolls >= CLEAR_POLLS_NEEDED && announcedName != null)
+                {
                     announcedName = null;
                     announcementPending = false;
                     waitingName = null;
                 }
-
-                waiting = nowWaiting;
 
                 // Keep a name once we have one. Both ways of learning it are momentary:
                 // the `fresh` flag clears when the player looks, and the "left COOKING
@@ -388,27 +417,16 @@ namespace AccessibilityMod.Patches
             // FreshCount counts every unseen thought, including a newly GAINED one that
             // blocks nothing - so it cannot decide the question, only open the gate. When
             // it is 0 and no splash is pending, there is provably nothing to look for and
-            // the scan is skipped entirely. Unreadable (-1) also opens the gate: better a
-            // scan too many than a missed block.
-            int freshCount = ReadFreshCount();
-            bool somethingIsNew = splashPending || freshCount != 0;
-
-            // Even with nothing new, refresh the cooking snapshot now and then: it is what
-            // names the finished thought if the `fresh` flag is not what marks the state,
-            // and a snapshot from an hour ago would name the wrong one.
-            bool timeForSnapshot = UnityEngine.Time.unscaledTime >= nextSnapshotTime;
-            if (!somethingIsNew && !timeForSnapshot) return false;
-            if (timeForSnapshot) nextSnapshotTime = UnityEngine.Time.unscaledTime + SNAPSHOT_SECONDS;
-
-            // One scan, two jobs: find the finished-but-unseen thought (the second signal,
-            // and the announcement's name), and note which thoughts are cooking right now
-            // so the NEXT poll can tell which one just stopped.
+            // One pass over the cached projects, two jobs: find the finished-but-unseen
+            // thought (the signal, and the announcement's name), and note which thoughts
+            // are cooking right now so the next poll can tell which one just stopped.
             var cookingNow = new System.Collections.Generic.HashSet<string>();
             bool scanned = false;
             try
             {
-                var projects = UnityEngine.Object.FindObjectsOfType<ThoughtCabinetProject>(true);
-                scanned = true;
+                var projects = GetProjects();
+                scanned = projects != null;
+                if (projects == null) return false;
                 foreach (var p in projects)
                 {
                     if (p == null) continue;
@@ -453,7 +471,14 @@ namespace AccessibilityMod.Patches
                 foreach (var c in cookingNow) lastCooking.Add(c);
             }
 
-            return freshFinished || splashPending;
+            // ONLY the fresh-and-finished thought decides. WillShowSplashScreenInstead is
+            // deliberately not part of this any more: measured live on 03.10.2026, it was
+            // False for the whole nine minutes the block was active and True only in the
+            // one second the splash was actually on screen. Despite its name it reports
+            // "a splash is showing", not "a splash is owed" - including it would have
+            // added a spurious edge every time the player opens the screen. It stays in
+            // the log line as a cross-check, nothing more.
+            return freshFinished;
         }
     }
 
