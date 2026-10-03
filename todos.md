@@ -83,9 +83,16 @@ womit sie anfangen will; nichts davon ohne ihr Okay beginnen.
   `F` dort? Vorher speichern — ein versehentlicher Verkauf wäre nur durch Neuladen
   rückgängig zu machen. Szenarien (a) leerer Slot und (b) Inventar-Knopf sind erledigt;
   (b) stellte sich als per Tastatur gar nicht erreichbar heraus.
-- **Antwort an Danijel unter PR #2** — der alte Entwurf (beide Review-Befunde eingebaut,
-  (a)/(b) getestet, (c) offen) ist **überholt**, siehe Stand vom 30.09./03.10. unten.
-  Weiterhin gilt: **nicht posten ohne Janas Freigabe.**
+- [x] **Antwort an Danijel unter PR #2 — gepostet 03.10.2026** (von Jana freigegeben),
+  `#issuecomment-5971696953`. Inhalt: seine zwei Review-Befunde umgesetzt (`899f7bb`),
+  Testszenarien (a) erledigt / (b) per Tastatur nicht herstellbar / (c) Pfandleiher offen,
+  die zwei Copilot-Befunde als berechtigt bestätigt und auf `main` behoben, der Hinweis
+  dass sein `@copilot`-Auftrag folgenlos blieb, die offene `ShowTooltip`-Synchronitätsfrage
+  offengelegt, und die PR-Vergrößerung selbst angesprochen samt Angebot, den Branch wieder
+  aufs Inventar-Thema zusammenzuschnüren. **Jetzt bei ihm — Antwort abwarten.**
+  **Stilvorgabe für künftige Antworten an Danijel** (von Jana am 03.10. bestätigt): dieselbe
+  Form wie bisher — **deutsch**, geduzt, nummerierte Punkte entlang seiner Review, Jana in
+  der **dritten Person** („Jana testet gegen …"), Fußzeile „🤖 Generated with Claude Code".
 
 - **PR #2: Stand 03.10.2026.** Am **30.09.** hat ein Copilot-Reviewer zweimal zu
   `mod/Patches/InventoryPatches.cs` kommentiert; **Danijel hat inhaltlich nicht geantwortet**,
