@@ -83,9 +83,32 @@ womit sie anfangen will; nichts davon ohne ihr Okay beginnen.
   `F` dort? Vorher speichern — ein versehentlicher Verkauf wäre nur durch Neuladen
   rückgängig zu machen. Szenarien (a) leerer Slot und (b) Inventar-Knopf sind erledigt;
   (b) stellte sich als per Tastatur gar nicht erreichbar heraus.
-- **Antwort an Danijel unter PR #2** ist vorbereitet, aber **nicht gepostet** — Jana wollte
-  sie vorher freigeben. Inhalt: beide Review-Befunde eingebaut (`899f7bb`), (a) und (b)
-  getestet, (c) offen.
+- **Antwort an Danijel unter PR #2** — der alte Entwurf (beide Review-Befunde eingebaut,
+  (a)/(b) getestet, (c) offen) ist **überholt**, siehe Stand vom 30.09./03.10. unten.
+  Weiterhin gilt: **nicht posten ohne Janas Freigabe.**
+
+- **PR #2: Stand 03.10.2026.** Am **30.09.** hat ein Copilot-Reviewer zweimal zu
+  `mod/Patches/InventoryPatches.cs` kommentiert; **Danijel hat inhaltlich nicht geantwortet**,
+  sondern nur „@copilot Fix the code for this review comment" geschrieben — **folgenlos**,
+  Copilot hat nichts gepusht. Beide Copilot-Befunde waren für den damaligen PR-Stand
+  **berechtigt** und auf `main` bereits behoben:
+  1. Die Besitzprüfung („ist das ein Inventar-Slot") beweist nicht, dass der **Singleton**-Tooltip
+     zu *diesem* Slot gehört — Danijels Befund betraf nur Buttons, Copilot erweitert ihn korrekt
+     auf **Slot→Slot**. Auf `main` gelöst durch `TooltipSource.ShowTooltip(true)` (kam mit J7),
+     das den Tooltip aus dem fokussierten Slot neu befüllt.
+     **Offen und nie geprüft:** ob `ShowTooltip(true)` **synchron** befüllt — sonst läse der
+     Code danach doch den alten Stand. Zusammen mit dem Pfandleiher-Gegentest klären.
+  2. Der `UIDragDock`-Zweig kehrt immer zurück, auch wenn nichts passiert → Taste wirkt tot.
+     Auf `main` gelöst durch die „lässt sich nicht anlegen"-Absage (`53b4f4b`, `a71819f`).
+  **Erledigt 03.10.:** Branch `reading-item-interaction` per Merge auf den Stand von Janas
+  `main` gebracht (Merge-Commit `20781c8`, gepusht, PR mergebar/CLEAN). Konflikte in
+  `InventoryPatches.cs`, `Loc.cs`, `todos.md` zugunsten von `main` aufgelöst, nachdem geprüft
+  war, dass `main` eine echte Obermenge ist (keine Code-Zeile existiert nur auf dem Branch);
+  der Branch ist inhaltlich identisch mit `main`.
+  **Nebenwirkung, von Jana bewusst in Kauf genommen** (ich hatte abgeraten): Der PR umfasst
+  jetzt **17 Dateien / +1769 Zeilen** statt 5 / 215 und enthält auch themenfremde Arbeit
+  (Traumbeschreibungen, J7-Anfahrtsseiten, J11-Gedankenwächter, Orb-TTS). Für Danijel
+  entsprechend schwerer zu prüfen — in der Antwort an ihn erwähnen.
 - **J9 (Objekt-Kategorisierung)** liegt auf Eis: Jana will sich das noch überlegen.
 
 **Stand der Auslieferung:** Alles committet und gepusht, nichts Uncommittetes. Die
